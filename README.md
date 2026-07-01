@@ -1,29 +1,28 @@
-# Vite+ Monorepo Starter
+# Solidus P2P - A library for simplifying development on data-heavy collaborative peer-to-peer platforms
 
-A starter for creating a Vite+ monorepo.
+## Repo Structure
 
-## Development
-
-- Check everything is ready:
+This is a monorepo made using [vite-plus](https://viteplus.dev/)
 
 ```bash
-vp run ready
-```
-
-- Run the tests:
-
-```bash
-vp run -r test
-```
-
-- Build the monorepo:
-
-```bash
-vp run -r build
-```
-
-- Run the development server:
-
-```bash
-vp run dev
+solidus-p2p
+├── apps                     # Demo of the application goes here
+│   └── website
+├── node_modules
+├── package.json
+├── package-lock.json
+├── packages                 # All libraries developed for the project go here
+│   └── core                 # Core package repo
+│       ├── node_modules
+│       ├── package.json
+│       ├── README.md
+│       ├── src
+│       │   └── index.ts
+│       ├── tests
+│       │   └── index.test.ts
+│       ├── tsconfig.json
+│       └── vite.config.ts
+├── README.md
+├── tsconfig.json
+└── vite.config.ts
 ```

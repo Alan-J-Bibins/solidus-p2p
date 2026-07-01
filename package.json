@@ -1,5 +1,5 @@
 {
-    "name": "solidus-p2p",
+    "name": "@solidus-p2p/root",
     "version": "0.0.0",
     "private": true,
     "workspaces": [
