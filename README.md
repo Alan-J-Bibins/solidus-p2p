@@ -1,4 +1,4 @@
-# Solidus P2P - A library for simplifying development on data-heavy collaborative peer-to-peer platforms
+# Solidus - A library for simplifying development on data-heavy collaborative peer-to-peer platforms
 
 ## Repo Structure
 
