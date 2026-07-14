@@ -1,11 +1,12 @@
 import { describe, test, expect } from 'vite-plus/test';
 
 import { createState } from '../../src/state-sync/index.ts';
+import type { StateOperation } from '../../src/state-sync/types.ts';
 
 describe('CRDT Proxy Handler Test Suite', () => {
     test('should intercept deep property mutations and generate a SET operation payload', () => {
-        const generatedOps: any[] = [];
-        const trackOp = (op: any) => generatedOps.push(op);
+        const generatedOps: StateOperation[] = [];
+        const trackOp = (op: StateOperation) => generatedOps.push(op);
 
         const initialState = {
             user: {
@@ -23,7 +24,7 @@ describe('CRDT Proxy Handler Test Suite', () => {
         expect(state.user.preferences.theme).toBe('dark');
         expect(generatedOps).toHaveLength(1);
         expect(generatedOps[0]).toEqual({
-            type: 'SET',
+            type: 'set',
             path: ['user', 'preferences', 'theme'],
             value: 'dark',
             timestamp: expect.any(Number),
@@ -31,8 +32,8 @@ describe('CRDT Proxy Handler Test Suite', () => {
     });
 
     test('should intercept array methods and capture them as cohesive list mutations', () => {
-        const generatedOps: any[] = [];
-        const trackOp = (op: any) => generatedOps.push(op);
+        const generatedOps: StateOperation[] = [];
+        const trackOp = (op: StateOperation) => generatedOps.push(op);
 
         const state = createState({ tasks: ['Task 1'] }, trackOp);
 
