@@ -16,6 +16,7 @@
         "dist"
     ],
     "type": "module",
+    "types": "./src/index.ts",
     "exports": {
         ".": "./dist/index.mjs",
         "./package.json": "./package.json"

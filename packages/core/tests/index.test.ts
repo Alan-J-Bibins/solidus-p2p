@@ -31,4 +31,4 @@ test('two peers connect and exchange a message', async () => {
 
     peerA.close();
     peerB.close();
-});
+}, 10000); // WebRTC handshake can take longer than the default 5s timeout

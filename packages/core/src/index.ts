@@ -22,14 +22,12 @@ export class P2PPeer {
             iceServers: options.iceServers ?? [],
         });
 
-        // Whenever the browser/Node discovers a network path, forward it out.
         this.connection.onicecandidate = (event) => {
             if (event.candidate) {
                 this.onSignal({ type: 'ice-candidate', candidate: event.candidate.toJSON() });
             }
         };
 
-        // The answering peer receives its data channel this way (it didn't create one).
         this.connection.ondatachannel = (event) => {
             this.attachDataChannel(event.channel);
         };
@@ -47,7 +45,6 @@ export class P2PPeer {
         };
     }
 
-    /** Call this on the peer that initiates the connection. */
     async createOffer(): Promise<void> {
         this.attachDataChannel(this.connection.createDataChannel('data'));
         const offer = await this.connection.createOffer();
@@ -55,7 +52,6 @@ export class P2PPeer {
         this.onSignal({ type: 'offer', sdp: offer });
     }
 
-    /** Feed every incoming signaling message (from whatever transport) here. */
     async handleSignal(message: SignalingMessage): Promise<void> {
         switch (message.type) {
             case 'offer': {
