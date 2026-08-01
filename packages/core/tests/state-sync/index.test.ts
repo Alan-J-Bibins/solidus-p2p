@@ -1,16 +1,7 @@
 import { describe, test, expect } from 'vite-plus/test';
 
 import { createState } from '../../src/state-sync/index.ts';
-import type { StateOperation } from '../../src/state-sync/types.ts';
-
-// ─────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────
-function makeTracker() {
-    const ops: StateOperation[] = [];
-    const trackOp = (op: StateOperation) => ops.push(op);
-    return { ops, trackOp };
-}
+import { makeTracker } from './utils.ts';
 
 // ═════════════════════════════════════════════════════════════
 // 1. DEEP OBJECT MUTATIONS

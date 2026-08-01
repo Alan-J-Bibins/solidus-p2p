@@ -1,21 +1,27 @@
 export type StateOperationType =
     // Property Reading & Writing (Most Common for State)
-    | 'get'
-    | 'set'
-    | 'has'
-    | 'deleteProperty'
+    | 'GET'
+    | 'SET'
+    | 'HAS'
+    | 'DELETE_PROPERTY'
     // Object Configuration & Reflection
-    | 'ownKeys'
-    | 'defineProperty'
-    | 'getOwnPropertyDescriptor'
-    | 'preventExtensions'
-    | 'isExtensible'
+    | 'OWN_KEYS'
+    | 'DEFINE_PROPERTY'
+    | 'GET_OWN_PROPERTY_DESCRIPTOR'
+    | 'PREVENT_EXTENSIONS'
+    | 'IS_EXTENSIBLE'
     // Prototype Chain Interception
-    | 'getPrototypeOf'
-    | 'setPrototypeOf'
+    | 'GET_PROTOTYPE_OF'
+    | 'SET_PROTOTYPE_OF'
     // Function & Class Execution (If your state has callable functions)
-    | 'apply'
-    | 'construct';
+    | 'APPLY'
+    | 'CONSTRUCT'
+    // Array specific functions
+    | 'ARRAY_INSERT'
+    | 'ARRAY_REMOVE'
+    | 'ARRAY_UPDATE'
+    | 'ARRAY_RESIZE'
+    | 'ARRAY_REPLACE';
 
 export type StateOperation = {
     type: StateOperationType;
