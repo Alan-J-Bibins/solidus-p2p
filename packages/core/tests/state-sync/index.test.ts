@@ -14,7 +14,7 @@ describe('Deep object mutations', () => {
         state.count = 5;
 
         expect(ops).toHaveLength(1);
-        expect(ops[0]).toMatchObject({ type: 'set', path: ['count'], value: 5 });
+        expect(ops[0]).toMatchObject({ type: 'SET', path: ['count'], value: 5 });
     });
 
     test('emits SET with full nested path for deep writes', () => {
@@ -25,7 +25,7 @@ describe('Deep object mutations', () => {
 
         expect(ops).toHaveLength(1);
         expect(ops[0]).toMatchObject({
-            type: 'set',
+            type: 'SET',
             path: ['user', 'profile', 'name'],
             value: 'Bob',
         });
@@ -39,7 +39,7 @@ describe('Deep object mutations', () => {
 
         expect(ops).toHaveLength(1);
         expect(ops[0]).toMatchObject({
-            type: 'set',
+            type: 'SET',
             path: ['user'],
             value: { name: 'Bob' },
         });
@@ -56,8 +56,8 @@ describe('Deep object mutations', () => {
         state.b = undefined;
 
         expect(ops).toHaveLength(2);
-        expect(ops[0]).toMatchObject({ type: 'set', path: ['a'], value: null });
-        expect(ops[1]).toMatchObject({ type: 'set', path: ['b'], value: undefined });
+        expect(ops[0]).toMatchObject({ type: 'SET', path: ['a'], value: null });
+        expect(ops[1]).toMatchObject({ type: 'SET', path: ['b'], value: undefined });
     });
 
     test('emits SET for every write in a sequential batch', () => {
@@ -85,7 +85,7 @@ describe('Property deletion', () => {
 
         expect(ops).toHaveLength(1);
         expect(ops[0]).toMatchObject({
-            type: 'deleteProperty',
+            type: 'DELETE_PROPERTY',
             path: ['a'],
             value: 1,
         });
@@ -98,7 +98,7 @@ describe('Property deletion', () => {
 
         delete state.missing;
 
-        expect(ops).toHaveLength(0); // ⚠️ check your impl — Reflect.deleteProperty returns true either way
+        expect(ops).toHaveLength(0);
     });
 });
 
