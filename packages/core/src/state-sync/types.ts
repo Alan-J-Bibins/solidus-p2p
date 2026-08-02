@@ -21,7 +21,10 @@ export type StateOperationType =
     | 'ARRAY_REMOVE'
     | 'ARRAY_UPDATE'
     | 'ARRAY_RESIZE'
-    | 'ARRAY_REPLACE';
+    | 'ARRAY_REPLACE'
+    | 'MAP_SET'
+    | 'MAP_REMOVE'
+    | 'MAP_CLEAR';
 
 export type StateOperation = {
     type: StateOperationType;

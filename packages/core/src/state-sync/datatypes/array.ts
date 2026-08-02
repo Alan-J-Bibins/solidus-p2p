@@ -196,7 +196,7 @@ export class ArrayWrapper<T> {
     }
 }
 
-export function createArrayProxy<T>(
+export function createArrayWrapper<T>(
     initial: T[] = [],
     emit: (op: StateOperation) => void,
     path: string[] = [],

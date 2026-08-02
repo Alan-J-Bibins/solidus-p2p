@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'vite-plus/test';
 
-import { createArrayProxy } from '../../../src/state-sync/datatypes/array.ts';
+import { createArrayWrapper } from '../../../src/state-sync/datatypes/array.ts';
 import { makeTracker } from '../utils.ts';
 
-describe('Testing the ArrayProxy class', () => {
+describe('Testing the ArrayWrapper class', () => {
     test('Testing reads', () => {
         const { ops, trackOp } = makeTracker();
         const initial: number[] = [];
-        const array = createArrayProxy(initial, trackOp);
+        const array = createArrayWrapper(initial, trackOp);
         array.push(9);
 
         expect(ops).toHaveLength(1);
@@ -23,7 +23,7 @@ describe('Testing the ArrayProxy class', () => {
     test('Assigning value to a specific index', () => {
         const { ops, trackOp } = makeTracker();
         const initial: number[] = [];
-        const array = createArrayProxy(initial, trackOp);
+        const array = createArrayWrapper(initial, trackOp);
         array[0] = 10;
 
         expect(ops).toStrictEqual([
@@ -39,7 +39,7 @@ describe('Testing the ArrayProxy class', () => {
     // ─── push ────────────────────────────────────────────────────────────────
     test('push with multiple items emits individual ARRAY_INSERT ops', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2], trackOp);
+        const array = createArrayWrapper([1, 2], trackOp);
         array.push(3, 4, 5);
 
         expect(ops).toStrictEqual([
@@ -51,7 +51,7 @@ describe('Testing the ArrayProxy class', () => {
 
     test('push returns new length', () => {
         const { trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2], trackOp);
+        const array = createArrayWrapper([1, 2], trackOp);
         expect(array.push(3)).toBe(3);
         expect(array.push(4, 5)).toBe(5);
     });
@@ -59,7 +59,7 @@ describe('Testing the ArrayProxy class', () => {
     // ─── pop ─────────────────────────────────────────────────────────────────
     test('pop emits ARRAY_REMOVE and returns last element', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([10, 20, 30], trackOp);
+        const array = createArrayWrapper([10, 20, 30], trackOp);
         const popped = array.pop();
 
         expect(popped).toBe(30);
@@ -75,7 +75,7 @@ describe('Testing the ArrayProxy class', () => {
 
     test('pop on empty array emits no op and returns undefined', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy<number>([], trackOp);
+        const array = createArrayWrapper<number>([], trackOp);
         expect(array.pop()).toBeUndefined();
         expect(ops).toHaveLength(0);
     });
@@ -83,7 +83,7 @@ describe('Testing the ArrayProxy class', () => {
     // ─── shift ───────────────────────────────────────────────────────────────
     test('shift emits ARRAY_REMOVE at index 0 and returns first element', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([100, 200, 300], trackOp);
+        const array = createArrayWrapper([100, 200, 300], trackOp);
         const shifted = array.shift();
 
         expect(shifted).toBe(100);
@@ -99,7 +99,7 @@ describe('Testing the ArrayProxy class', () => {
 
     test('shift on empty array emits no op', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy<number>([], trackOp);
+        const array = createArrayWrapper<number>([], trackOp);
         expect(array.shift()).toBeUndefined();
         expect(ops).toHaveLength(0);
     });
@@ -107,7 +107,7 @@ describe('Testing the ArrayProxy class', () => {
     // ─── unshift ─────────────────────────────────────────────────────────────
     test('unshift emits ARRAY_INSERT ops for each item at front', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([4], trackOp);
+        const array = createArrayWrapper([4], trackOp);
         array.unshift(1, 2, 3);
 
         expect(ops).toStrictEqual([
@@ -119,14 +119,14 @@ describe('Testing the ArrayProxy class', () => {
 
     test('unshift returns new length', () => {
         const { trackOp } = makeTracker();
-        const array = createArrayProxy([1], trackOp);
+        const array = createArrayWrapper([1], trackOp);
         expect(array.unshift(0)).toBe(2);
     });
 
     // ─── splice ──────────────────────────────────────────────────────────────
     test('splice delete-only emits ARRAY_REMOVE ops', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2, 3, 4, 5], trackOp);
+        const array = createArrayWrapper([1, 2, 3, 4, 5], trackOp);
         const removed = array.splice(1, 2);
 
         expect(removed).toEqual([2, 3]);
@@ -138,7 +138,7 @@ describe('Testing the ArrayProxy class', () => {
 
     test('splice insert-only emits ARRAY_INSERT ops', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 4], trackOp);
+        const array = createArrayWrapper([1, 4], trackOp);
         array.splice(1, 0, 2, 3);
 
         expect(ops).toStrictEqual([
@@ -149,7 +149,7 @@ describe('Testing the ArrayProxy class', () => {
 
     test('splice delete + insert emits REMOVE then INSERT', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2, 3, 4], trackOp);
+        const array = createArrayWrapper([1, 2, 3, 4], trackOp);
         array.splice(1, 2, 20, 30);
 
         expect(ops).toStrictEqual([
@@ -162,7 +162,7 @@ describe('Testing the ArrayProxy class', () => {
 
     test('splice with negative start resolves from end', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2, 3, 4, 5], trackOp);
+        const array = createArrayWrapper([1, 2, 3, 4, 5], trackOp);
         array.splice(-2, 1);
 
         expect(ops[0].path).toEqual(['3']);
@@ -171,7 +171,7 @@ describe('Testing the ArrayProxy class', () => {
 
     test('splice omitting deleteCount removes all from start to end', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2, 3, 4], trackOp);
+        const array = createArrayWrapper([1, 2, 3, 4], trackOp);
         const removed = array.splice(1);
 
         expect(removed).toEqual([2, 3, 4]);
@@ -181,7 +181,7 @@ describe('Testing the ArrayProxy class', () => {
     // ─── sort ────────────────────────────────────────────────────────────────
     test('sort emits ARRAY_REPLACE with sorted values', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([3, 1, 2], trackOp);
+        const array = createArrayWrapper([3, 1, 2], trackOp);
         array.sort();
 
         expect(ops).toStrictEqual([
@@ -196,7 +196,7 @@ describe('Testing the ArrayProxy class', () => {
 
     test('sort with custom compareFn', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2, 3], trackOp);
+        const array = createArrayWrapper([1, 2, 3], trackOp);
         array.sort((a, b) => b - a);
 
         expect(ops[0].value).toEqual([3, 2, 1]);
@@ -204,7 +204,7 @@ describe('Testing the ArrayProxy class', () => {
 
     test('sort on empty array emits ARRAY_REPLACE with empty array', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy<number>([], trackOp);
+        const array = createArrayWrapper<number>([], trackOp);
         array.sort();
 
         expect(ops).toStrictEqual([
@@ -220,7 +220,7 @@ describe('Testing the ArrayProxy class', () => {
     // ─── reverse ─────────────────────────────────────────────────────────────
     test('reverse emits ARRAY_REPLACE with reversed values', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2, 3], trackOp);
+        const array = createArrayWrapper([1, 2, 3], trackOp);
         array.reverse();
 
         expect(ops).toStrictEqual([
@@ -236,7 +236,7 @@ describe('Testing the ArrayProxy class', () => {
     // ─── fill ────────────────────────────────────────────────────────────────
     test('fill emits ARRAY_REPLACE with filled values', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2, 3], trackOp);
+        const array = createArrayWrapper([1, 2, 3], trackOp);
         array.fill(0);
 
         expect(ops[0]).toStrictEqual({
@@ -249,7 +249,7 @@ describe('Testing the ArrayProxy class', () => {
 
     test('fill with start and end bounds', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2, 3, 4], trackOp);
+        const array = createArrayWrapper([1, 2, 3, 4], trackOp);
         array.fill(99, 1, 3);
 
         expect(ops[0].value).toEqual([1, 99, 99, 4]);
@@ -258,7 +258,7 @@ describe('Testing the ArrayProxy class', () => {
     // ─── copyWithin ──────────────────────────────────────────────────────────
     test('copyWithin emits ARRAY_REPLACE', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2, 3, 4, 5], trackOp);
+        const array = createArrayWrapper([1, 2, 3, 4, 5], trackOp);
         array.copyWithin(0, 3);
 
         expect(ops[0]).toStrictEqual({
@@ -272,7 +272,7 @@ describe('Testing the ArrayProxy class', () => {
     // ─── setIndex (via bracket assignment) ───────────────────────────────────
     test('setting existing index emits ARRAY_UPDATE', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([10, 20, 30], trackOp);
+        const array = createArrayWrapper([10, 20, 30], trackOp);
         array[1] = 99;
 
         expect(ops).toStrictEqual([
@@ -287,7 +287,7 @@ describe('Testing the ArrayProxy class', () => {
 
     test('setting index past end emits ARRAY_INSERT', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1], trackOp);
+        const array = createArrayWrapper([1], trackOp);
         array[5] = 50;
 
         expect(ops[0].type).toBe('ARRAY_INSERT');
@@ -298,7 +298,7 @@ describe('Testing the ArrayProxy class', () => {
     // ─── setLength (via length assignment) ───────────────────────────────────
     test('setting length shorter emits ARRAY_RESIZE', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2, 3, 4, 5], trackOp);
+        const array = createArrayWrapper([1, 2, 3, 4, 5], trackOp);
         array.length = 2;
 
         expect(ops).toStrictEqual([
@@ -313,14 +313,14 @@ describe('Testing the ArrayProxy class', () => {
 
     test('setting length to same value emits no op', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2, 3], trackOp);
+        const array = createArrayWrapper([1, 2, 3], trackOp);
         array.length = 3;
         expect(ops).toHaveLength(0);
     });
 
     test('setting length longer emits ARRAY_RESIZE', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1], trackOp);
+        const array = createArrayWrapper([1], trackOp);
         array.length = 5;
 
         expect(ops[0].type).toBe('ARRAY_RESIZE');
@@ -330,7 +330,7 @@ describe('Testing the ArrayProxy class', () => {
     // ─── deleteIndex (via delete operator) ───────────────────────────────────
     test('delete emits ARRAY_REMOVE via splice delegation', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([10, 20, 30], trackOp);
+        const array = createArrayWrapper([10, 20, 30], trackOp);
         delete array[1];
 
         expect(ops).toStrictEqual([
@@ -340,7 +340,7 @@ describe('Testing the ArrayProxy class', () => {
 
     test('delete out-of-bounds index emits no op', () => {
         const { ops, trackOp } = makeTracker();
-        const array = createArrayProxy([1, 2], trackOp);
+        const array = createArrayWrapper([1, 2], trackOp);
         delete array[5];
         expect(ops).toHaveLength(0);
     });
