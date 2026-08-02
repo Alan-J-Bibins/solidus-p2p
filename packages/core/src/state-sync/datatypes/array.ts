@@ -100,7 +100,11 @@ export class ArrayWrapper<T> {
                 timestamp: now,
             });
         }
-        return Array.prototype.splice.apply(this._store, [start, deleteCount, ...items] as any);
+        return Array.prototype.splice.apply(this._store, [
+            actualStart,
+            actualDelete,
+            ...items,
+        ] as any);
     }
 
     sort(compareFn?: (a: T, b: T) => number): T[] {
@@ -244,7 +248,8 @@ export function createArrayProxy<T>(
 
         deleteProperty(target, property): boolean {
             if (typeof property === 'string' && /^\d+$/.test(property)) {
-                return target.deleteIndex(Number(property));
+                target.deleteIndex(Number(property));
+                return true;
             }
             return Reflect.deleteProperty(target, property);
         },
