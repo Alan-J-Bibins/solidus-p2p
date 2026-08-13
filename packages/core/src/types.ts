@@ -8,7 +8,10 @@ export type SolidusEvents = {
 
 export type SolidusPlugin = {
     name: string;
-    setup: (events: SolidusEvents) => void;
+    setup?: (events: SolidusEvents) => void;
+
+    provides?: string[];
+    create?: (type: string, options: any, events: SolidusEvents) => any;
 };
 
 /**
@@ -36,4 +39,9 @@ export type SolidusInstance = {
      * through `onUpdate` (or the global `onStateOperation` from config).
      */
     createState<T extends object>(obj: T, onUpdate?: (op: StateOperation) => void): T;
+
+    /**
+     * Create any solidus resource
+     */
+    create: (resourceConfig: { type: string; label?: string; config?: any }) => any;
 };
