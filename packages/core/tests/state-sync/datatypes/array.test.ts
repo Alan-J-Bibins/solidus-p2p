@@ -57,7 +57,7 @@ describe('Testing the ArrayWrapper class', () => {
     });
 
     // ─── pop ─────────────────────────────────────────────────────────────────
-    test('pop emits ARRAY_REMOVE and returns last element', () => {
+    test('pop emits ARRAY_DELETE and returns last element', () => {
         const { ops, trackOp } = makeTracker();
         const array = createArrayWrapper([10, 20, 30], trackOp);
         const popped = array.pop();
@@ -65,7 +65,7 @@ describe('Testing the ArrayWrapper class', () => {
         expect(popped).toBe(30);
         expect(ops).toStrictEqual([
             {
-                type: 'ARRAY_REMOVE',
+                type: 'ARRAY_DELETE',
                 path: ['2'],
                 value: 30,
                 timestamp: expect.any(Number),
@@ -81,7 +81,7 @@ describe('Testing the ArrayWrapper class', () => {
     });
 
     // ─── shift ───────────────────────────────────────────────────────────────
-    test('shift emits ARRAY_REMOVE at index 0 and returns first element', () => {
+    test('shift emits ARRAY_DELETE at index 0 and returns first element', () => {
         const { ops, trackOp } = makeTracker();
         const array = createArrayWrapper([100, 200, 300], trackOp);
         const shifted = array.shift();
@@ -89,7 +89,7 @@ describe('Testing the ArrayWrapper class', () => {
         expect(shifted).toBe(100);
         expect(ops).toStrictEqual([
             {
-                type: 'ARRAY_REMOVE',
+                type: 'ARRAY_DELETE',
                 path: ['0'],
                 value: 100,
                 timestamp: expect.any(Number),
@@ -124,15 +124,15 @@ describe('Testing the ArrayWrapper class', () => {
     });
 
     // ─── splice ──────────────────────────────────────────────────────────────
-    test('splice delete-only emits ARRAY_REMOVE ops', () => {
+    test('splice delete-only emits ARRAY_DELETE ops', () => {
         const { ops, trackOp } = makeTracker();
         const array = createArrayWrapper([1, 2, 3, 4, 5], trackOp);
         const removed = array.splice(1, 2);
 
         expect(removed).toEqual([2, 3]);
         expect(ops).toStrictEqual([
-            { type: 'ARRAY_REMOVE', path: ['1'], value: 2, timestamp: expect.any(Number) },
-            { type: 'ARRAY_REMOVE', path: ['1'], value: 3, timestamp: expect.any(Number) },
+            { type: 'ARRAY_DELETE', path: ['1'], value: 2, timestamp: expect.any(Number) },
+            { type: 'ARRAY_DELETE', path: ['1'], value: 3, timestamp: expect.any(Number) },
         ]);
     });
 
@@ -147,14 +147,14 @@ describe('Testing the ArrayWrapper class', () => {
         ]);
     });
 
-    test('splice delete + insert emits REMOVE then INSERT', () => {
+    test('splice delete + insert emits DELETE then INSERT', () => {
         const { ops, trackOp } = makeTracker();
         const array = createArrayWrapper([1, 2, 3, 4], trackOp);
         array.splice(1, 2, 20, 30);
 
         expect(ops).toStrictEqual([
-            { type: 'ARRAY_REMOVE', path: ['1'], value: 2, timestamp: expect.any(Number) },
-            { type: 'ARRAY_REMOVE', path: ['1'], value: 3, timestamp: expect.any(Number) },
+            { type: 'ARRAY_DELETE', path: ['1'], value: 2, timestamp: expect.any(Number) },
+            { type: 'ARRAY_DELETE', path: ['1'], value: 3, timestamp: expect.any(Number) },
             { type: 'ARRAY_INSERT', path: ['1'], value: 20, timestamp: expect.any(Number) },
             { type: 'ARRAY_INSERT', path: ['2'], value: 30, timestamp: expect.any(Number) },
         ]);
@@ -328,13 +328,13 @@ describe('Testing the ArrayWrapper class', () => {
     });
 
     // ─── deleteIndex (via delete operator) ───────────────────────────────────
-    test('delete emits ARRAY_REMOVE via splice delegation', () => {
+    test('delete emits ARRAY_DELETE via splice delegation', () => {
         const { ops, trackOp } = makeTracker();
         const array = createArrayWrapper([10, 20, 30], trackOp);
         delete array[1];
 
         expect(ops).toStrictEqual([
-            { type: 'ARRAY_REMOVE', path: ['1'], value: 20, timestamp: expect.any(Number) },
+            { type: 'ARRAY_DELETE', path: ['1'], value: 20, timestamp: expect.any(Number) },
         ]);
     });
 

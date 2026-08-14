@@ -42,7 +42,7 @@ export class ArrayWrapper<T> {
         const idx = this._store.length - 1;
         const value = this._store[idx];
         this._emit({
-            type: 'ARRAY_REMOVE',
+            type: 'ARRAY_DELETE',
             path: [...this._path, String(idx)],
             value,
             timestamp: Date.now(),
@@ -54,7 +54,7 @@ export class ArrayWrapper<T> {
         if (this._store.length === 0) return undefined;
         const value = this._store[0];
         this._emit({
-            type: 'ARRAY_REMOVE',
+            type: 'ARRAY_DELETE',
             path: [...this._path, '0'],
             value,
             timestamp: Date.now(),
@@ -86,7 +86,7 @@ export class ArrayWrapper<T> {
 
         for (let i = 0; i < removed.length; i++) {
             this._emit({
-                type: 'ARRAY_REMOVE',
+                type: 'ARRAY_DELETE',
                 path: [...this._path, String(actualStart)],
                 value: removed[i],
                 timestamp: now,
@@ -194,6 +194,107 @@ export class ArrayWrapper<T> {
     toJSON(): T[] {
         return [...this._store];
     }
+
+    map<U>(callbackfn: (value: T, index: number, array: T[]) => U, thisArg?: any): U[] {
+        return this._store.map(callbackfn, thisArg);
+    }
+
+    filter(predicate: (value: T, index: number, array: T[]) => unknown, thisArg?: any): T[] {
+        return this._store.filter(predicate, thisArg);
+    }
+
+    find(predicate: (value: T, index: number, obj: T[]) => unknown, thisArg?: any): T | undefined {
+        return this._store.find(predicate, thisArg);
+    }
+
+    findIndex(predicate: (value: T, index: number, obj: T[]) => unknown, thisArg?: any): number {
+        return this._store.findIndex(predicate, thisArg);
+    }
+
+    includes(searchElement: T, fromIndex?: number): boolean {
+        return this._store.includes(searchElement, fromIndex);
+    }
+
+    indexOf(searchElement: T, fromIndex?: number): number {
+        return this._store.indexOf(searchElement, fromIndex);
+    }
+
+    lastIndexOf(searchElement: T, fromIndex?: number): number {
+        return this._store.lastIndexOf(searchElement, fromIndex);
+    }
+
+    every(predicate: (value: T, index: number, array: T[]) => unknown, thisArg?: any): boolean {
+        return this._store.every(predicate, thisArg);
+    }
+
+    some(predicate: (value: T, index: number, array: T[]) => unknown, thisArg?: any): boolean {
+        return this._store.some(predicate, thisArg);
+    }
+
+    reduce<U>(
+        callbackfn: (previousValue: U, currentValue: T, currentIndex: number, array: T[]) => U,
+        initialValue: U,
+    ): U {
+        return this._store.reduce(callbackfn, initialValue);
+    }
+
+    reduceRight<U>(
+        callbackfn: (previousValue: U, currentValue: T, currentIndex: number, array: T[]) => U,
+        initialValue: U,
+    ): U {
+        return this._store.reduceRight(callbackfn, initialValue);
+    }
+
+    forEach(callbackfn: (value: T, index: number, array: T[]) => void, thisArg?: any): void {
+        this._store.forEach(callbackfn, thisArg);
+    }
+
+    slice(start?: number, end?: number): T[] {
+        return this._store.slice(start, end);
+    }
+
+    concat(...items: (T | readonly T[])[]): T[] {
+        return this._store.concat(...items);
+    }
+
+    join(separator?: string): string {
+        return this._store.join(separator);
+    }
+
+    toString(): string {
+        return this._store.toString();
+    }
+
+    toLocaleString(): string {
+        return this._store.toLocaleString();
+    }
+
+    flat<A = T>(depth?: number): A[] {
+        return (this._store as any).flat(depth);
+    }
+
+    flatMap<U>(
+        callback: (value: T, index: number, array: T[]) => U | readonly U[],
+        thisArg?: any,
+    ): U[] {
+        return (this._store as any).flatMap(callback, thisArg);
+    }
+
+    at(index: number): T | undefined {
+        return (this._store as any).at(index);
+    }
+
+    entries(): IterableIterator<[number, T]> {
+        return this._store.entries();
+    }
+
+    keys(): IterableIterator<number> {
+        return this._store.keys();
+    }
+
+    values(): IterableIterator<T> {
+        return this._store.values();
+    }
 }
 
 export function createArrayWrapper<T>(
@@ -278,7 +379,7 @@ export function createArrayWrapper<T>(
                     value: target.length,
                     writable: true,
                     enumerable: false,
-                    configurable: false,
+                    configurable: true,
                 };
             }
             return Reflect.getOwnPropertyDescriptor(target, property);

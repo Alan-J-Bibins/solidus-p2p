@@ -116,8 +116,7 @@ describe('Array method mutations', () => {
         expect(ops).toHaveLength(1);
         expect(ops[0]).toMatchObject({
             type: 'ARRAY_INSERT',
-            path: ['tasks'],
-            index: 1,
+            path: ['tasks', '1'],
             value: 'b',
         });
     });
@@ -143,8 +142,7 @@ describe('Array method mutations', () => {
         expect(ops).toHaveLength(1);
         expect(ops[0]).toMatchObject({
             type: 'ARRAY_REMOVE',
-            path: ['tasks'],
-            index: 2,
+            path: ['tasks', '2'],
             value: 'c',
         });
     });
@@ -159,7 +157,7 @@ describe('Array method mutations', () => {
         expect(ops).toHaveLength(0);
     });
 
-    test('shift emits ARRAY_REMOVE at index 0', () => {
+    test('shift emits ARRAY_DELETE at index 0', () => {
         const { ops, trackOp } = makeTracker();
         const state = createState({ tasks: ['a', 'b', 'c'] }, trackOp);
 
@@ -168,9 +166,8 @@ describe('Array method mutations', () => {
         expect(shifted).toBe('a');
         expect(ops).toHaveLength(1);
         expect(ops[0]).toMatchObject({
-            type: 'ARRAY_REMOVE',
-            path: ['tasks'],
-            index: 0,
+            type: 'ARRAY_DELETE',
+            path: ['tasks', '0'],
             value: 'a',
         });
     });
@@ -183,8 +180,8 @@ describe('Array method mutations', () => {
 
         expect(state.tasks).toEqual(['a', 'b', 'c']);
         expect(ops).toHaveLength(2);
-        expect(ops[0]).toMatchObject({ type: 'ARRAY_INSERT', index: 0, value: 'a' });
-        expect(ops[1]).toMatchObject({ type: 'ARRAY_INSERT', index: 1, value: 'b' });
+        expect(ops[0]).toMatchObject({ type: 'ARRAY_INSERT', path: ['tasks', '0'], value: 'a' });
+        expect(ops[1]).toMatchObject({ type: 'ARRAY_INSERT', path: ['tasks', '1'], value: 'b' });
     });
 
     test('splice(remove-only) emits ARRAY_REMOVEs in sequence', () => {
@@ -196,8 +193,8 @@ describe('Array method mutations', () => {
         expect(removed).toEqual(['b', 'c']);
         expect(state.tasks).toEqual(['a', 'd']);
         expect(ops).toHaveLength(2);
-        expect(ops[0]).toMatchObject({ type: 'ARRAY_REMOVE', index: 1, value: 'b' });
-        expect(ops[1]).toMatchObject({ type: 'ARRAY_REMOVE', index: 1, value: 'c' }); // shifts
+        expect(ops[0]).toMatchObject({ type: 'ARRAY_REMOVE', path: ['tasks', '1'], value: 'b' });
+        expect(ops[1]).toMatchObject({ type: 'ARRAY_REMOVE', path: ['tasks', '1'], value: 'c' }); // shifts
     });
 
     test('splice(insert-only) emits ARRAY_INSERTs', () => {
@@ -208,8 +205,8 @@ describe('Array method mutations', () => {
 
         expect(state.tasks).toEqual(['a', 'b', 'c', 'd']);
         expect(ops).toHaveLength(2);
-        expect(ops[0]).toMatchObject({ type: 'ARRAY_INSERT', index: 1, value: 'b' });
-        expect(ops[1]).toMatchObject({ type: 'ARRAY_INSERT', index: 2, value: 'c' });
+        expect(ops[0]).toMatchObject({ type: 'ARRAY_INSERT', path: ['tasks', '1'], value: 'b' });
+        expect(ops[1]).toMatchObject({ type: 'ARRAY_INSERT', path: ['tasks', '2'], value: 'c' });
     });
 
     test('splice(replace) emits removes then inserts', () => {
@@ -221,9 +218,9 @@ describe('Array method mutations', () => {
         expect(state.tasks).toEqual(['a', 'x', 'y', 'c']);
         // 1 remove at index 1 ('b'), then inserts at 1 ('x') and 2 ('y')
         expect(ops).toHaveLength(3);
-        expect(ops[0]).toMatchObject({ type: 'ARRAY_REMOVE', index: 1, value: 'b' });
-        expect(ops[1]).toMatchObject({ type: 'ARRAY_INSERT', index: 1, value: 'x' });
-        expect(ops[2]).toMatchObject({ type: 'ARRAY_INSERT', index: 2, value: 'y' });
+        expect(ops[0]).toMatchObject({ type: 'ARRAY_REMOVE', path: ['tasks', '1'], value: 'b' });
+        expect(ops[1]).toMatchObject({ type: 'ARRAY_INSERT', path: ['tasks', '1'], value: 'x' });
+        expect(ops[2]).toMatchObject({ type: 'ARRAY_INSERT', path: ['tasks', '2'], value: 'y' });
     });
 
     test('sort emits a single ARRAY_REPLACE with the sorted snapshot', () => {
@@ -277,8 +274,7 @@ describe('Array direct mutations', () => {
         expect(ops).toHaveLength(1);
         expect(ops[0]).toMatchObject({
             type: 'ARRAY_UPDATE',
-            path: ['tasks'],
-            index: 1,
+            path: ['tasks', '1'],
             value: 'X',
         });
     });
@@ -291,7 +287,7 @@ describe('Array direct mutations', () => {
 
         expect(state.tasks).toEqual(['a', undefined, undefined, undefined, undefined, 'z']);
         expect(ops).toHaveLength(1);
-        expect(ops[0]).toMatchObject({ type: 'ARRAY_UPDATE', index: 5, value: 'z' });
+        expect(ops[0]).toMatchObject({ type: 'ARRAY_UPDATE', path: ['tasks', '5'], value: 'z' });
     });
 
     test('length truncation emits ARRAY_RESIZE', () => {
@@ -324,7 +320,7 @@ describe('Array direct mutations', () => {
 
         expect(ops).toHaveLength(1);
         expect(ops[0]).toMatchObject({
-            type: 'set',
+            type: 'SET',
             path: ['tasks'],
             value: ['x', 'y', 'z'],
         });
@@ -458,7 +454,7 @@ describe('Object read operations are silent', () => {
 // 7. Map WRAPPER
 // ═════════════════════════════════════════════════════════════
 describe('Map wrapper', () => {
-    test('set() on a new key emits MAP_INSERT', () => {
+    test('set() on a new key emits MAP_SET', () => {
         const { ops, trackOp } = makeTracker();
         const state = createState<{ m: Map<string, number> }>({ m: new Map() }, trackOp);
 
@@ -467,21 +463,20 @@ describe('Map wrapper', () => {
         expect(state.m.get('a')).toBe(1);
         expect(ops).toHaveLength(1);
         expect(ops[0]).toMatchObject({
-            type: 'MAP_INSERT',
-            path: ['m'],
-            key: 'a',
+            type: 'MAP_SET',
+            path: ['m', 'a'],
             value: 1,
         });
     });
 
-    test('set() on an existing key emits MAP_UPDATE', () => {
+    test('set() on an existing key emits MAP_SET', () => {
         const { ops, trackOp } = makeTracker();
         const state = createState<{ m: Map<string, number> }>({ m: new Map([['a', 1]]) }, trackOp);
 
         state.m.set('a', 99);
 
         expect(ops).toHaveLength(1);
-        expect(ops[0]).toMatchObject({ type: 'MAP_UPDATE', key: 'a', value: 99 });
+        expect(ops[0]).toMatchObject({ type: 'MAP_SET', path: ['m', 'a'], value: 99 });
     });
 
     test('delete() emits MAP_DELETE', () => {
@@ -492,7 +487,7 @@ describe('Map wrapper', () => {
 
         expect(state.m.has('a')).toBe(false);
         expect(ops).toHaveLength(1);
-        expect(ops[0]).toMatchObject({ type: 'MAP_DELETE', key: 'a' });
+        expect(ops[0]).toMatchObject({ type: 'MAP_DELETE', path: ['m', 'a'], value: 'a' });
     });
 
     test('clear() emits MAP_CLEAR', () => {
@@ -511,7 +506,7 @@ describe('Map wrapper', () => {
 
         expect(state.m.size).toBe(0);
         expect(ops).toHaveLength(1);
-        expect(ops[0]).toMatchObject({ type: 'MAP_CLEAR', path: ['m'] });
+        expect(ops[0]).toMatchObject({ type: 'MAP_CLEAR', path: ['m'], value: null });
     });
 
     test('get / has / size / iteration emit zero ops', () => {
@@ -554,7 +549,7 @@ describe('Set wrapper', () => {
         expect(ops).toHaveLength(0);
     });
 
-    test('delete() emits SET_DELETE', () => {
+    test('delete() emits SET_REMOVE', () => {
         const { ops, trackOp } = makeTracker();
         const state = createState<{ s: Set<string> }>({ s: new Set(['a', 'b']) }, trackOp);
 
@@ -562,7 +557,7 @@ describe('Set wrapper', () => {
 
         expect(state.s.has('a')).toBe(false);
         expect(ops).toHaveLength(1);
-        expect(ops[0]).toMatchObject({ type: 'SET_DELETE', value: 'a' });
+        expect(ops[0]).toMatchObject({ type: 'SET_REMOVE', path: ['s'], value: 'a' });
     });
 
     test('clear() emits SET_CLEAR', () => {
@@ -573,7 +568,7 @@ describe('Set wrapper', () => {
 
         expect(state.s.size).toBe(0);
         expect(ops).toHaveLength(1);
-        expect(ops[0]).toMatchObject({ type: 'SET_CLEAR', path: ['s'] });
+        expect(ops[0]).toMatchObject({ type: 'SET_CLEAR', path: ['s'], value: null });
     });
 
     test('spread / iteration / has emit zero ops', () => {
@@ -645,8 +640,7 @@ describe('Edge cases', () => {
         expect(ops).toHaveLength(1);
         expect(ops[0]).toMatchObject({
             type: 'ARRAY_INSERT',
-            path: ['team', 'members'],
-            index: 1,
+            path: ['team', 'members', '1'],
             value: 'Bob',
         });
     });
@@ -700,7 +694,7 @@ describe('Edge cases', () => {
         delete state.a[1];
 
         expect(ops).toHaveLength(1);
-        expect(ops[0]).toMatchObject({ type: 'ARRAY_REMOVE', index: 1, value: 2 });
+        expect(ops[0]).toMatchObject({ type: 'ARRAY_DELETE', path: ['a', '1'], value: 2 });
     });
 
     test('no echo loop: wrapper-applied remote ops do not re-emit', () => {

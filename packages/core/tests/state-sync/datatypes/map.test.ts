@@ -101,7 +101,7 @@ describe('Testing the MapWrapper class', () => {
     });
 
     // ─── delete ──────────────────────────────────────────────────────────────
-    test('delete emits MAP_REMOVE for existing key', () => {
+    test('delete emits MAP_DELETE for existing key', () => {
         const { ops, trackOp } = makeTracker();
         const map = createMapWrapper(new Map([['key', 'value']]), trackOp);
         const result = map.delete('key');
@@ -109,7 +109,7 @@ describe('Testing the MapWrapper class', () => {
         expect(result).toBe(true);
         expect(ops).toStrictEqual([
             {
-                type: 'MAP_REMOVE',
+                type: 'MAP_DELETE',
                 path: ['key'],
                 value: 'key',
                 timestamp: expect.any(Number),
@@ -127,7 +127,7 @@ describe('Testing the MapWrapper class', () => {
     });
 
     // ─── clear ───────────────────────────────────────────────────────────────
-    test('clear emits MAP_REMOVE and empties map', () => {
+    test('clear emits MAP_CLEAR and empties map', () => {
         const { ops, trackOp } = makeTracker();
         const map = createMapWrapper(
             new Map([
@@ -140,7 +140,7 @@ describe('Testing the MapWrapper class', () => {
 
         expect(ops).toStrictEqual([
             {
-                type: 'MAP_REMOVE',
+                type: 'MAP_CLEAR',
                 path: [],
                 value: null,
                 timestamp: expect.any(Number),

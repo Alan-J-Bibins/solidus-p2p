@@ -30,7 +30,7 @@ export class MapWrapper<K, V> {
     delete(key: K) {
         if (this._store.has(key)) {
             this._emit({
-                type: 'MAP_REMOVE',
+                type: 'MAP_DELETE',
                 path: [...this._path, String(key)],
                 value: key,
                 timestamp: Date.now(),
@@ -44,7 +44,7 @@ export class MapWrapper<K, V> {
 
     clear() {
         this._emit({
-            type: 'MAP_REMOVE',
+            type: 'MAP_CLEAR',
             path: [...this._path],
             value: null,
             timestamp: Date.now(),
