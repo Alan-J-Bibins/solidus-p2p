@@ -41,7 +41,7 @@ export function createStateProxy<T extends object>(
             const fullPath = [...path, String(property)];
 
             handleUpdation({
-                type: 'set',
+                type: 'SET',
                 path: fullPath,
                 value,
                 timestamp: Date.now(),
@@ -52,7 +52,7 @@ export function createStateProxy<T extends object>(
         has: (target, property) => {
             const result = Reflect.has(target, property);
             handleUpdation({
-                type: 'has',
+                type: 'HAS',
                 path: [...path, String(property)],
                 value: result,
                 timestamp: Date.now(),
@@ -64,7 +64,7 @@ export function createStateProxy<T extends object>(
             const value = Reflect.get(target, property);
             const result = Reflect.deleteProperty(target, property);
             handleUpdation({
-                type: 'deleteProperty',
+                type: 'DELETE_PROPERTY',
                 path: [...path, String(property)],
                 value,
                 timestamp: Date.now(),
@@ -75,7 +75,7 @@ export function createStateProxy<T extends object>(
         ownKeys: (target) => {
             const keys = Reflect.ownKeys(target);
             handleUpdation({
-                type: 'ownKeys',
+                type: 'OWN_KEYS',
                 path,
                 value: keys,
                 timestamp: Date.now(),
@@ -86,7 +86,7 @@ export function createStateProxy<T extends object>(
         defineProperty: (target, property, attributes) => {
             const result = Reflect.defineProperty(target, property, attributes);
             handleUpdation({
-                type: 'defineProperty',
+                type: 'DEFINE_PROPERTY',
                 path: [...path, String(property)],
                 value: attributes,
                 timestamp: Date.now(),
@@ -97,7 +97,7 @@ export function createStateProxy<T extends object>(
         getOwnPropertyDescriptor: (target, property) => {
             const descriptor = Reflect.getOwnPropertyDescriptor(target, property);
             handleUpdation({
-                type: 'getOwnPropertyDescriptor',
+                type: 'GET_OWN_PROPERTY_DESCRIPTOR',
                 path: [...path, String(property)],
                 value: descriptor,
                 timestamp: Date.now(),
@@ -108,7 +108,7 @@ export function createStateProxy<T extends object>(
         preventExtensions: (target) => {
             const result = Reflect.preventExtensions(target);
             handleUpdation({
-                type: 'preventExtensions',
+                type: 'PREVENT_EXTENSIONS',
                 path,
                 value: null,
                 timestamp: Date.now(),
@@ -119,7 +119,7 @@ export function createStateProxy<T extends object>(
         isExtensible: (target) => {
             const result = Reflect.isExtensible(target);
             handleUpdation({
-                type: 'isExtensible',
+                type: 'IS_EXTENSIBLE',
                 path,
                 value: result,
                 timestamp: Date.now(),
@@ -130,7 +130,7 @@ export function createStateProxy<T extends object>(
         getPrototypeOf: (target) => {
             const proto = Reflect.getPrototypeOf(target);
             handleUpdation({
-                type: 'getPrototypeOf',
+                type: 'GET_PROTOTYPE_OF',
                 path,
                 value: proto,
                 timestamp: Date.now(),
@@ -141,7 +141,7 @@ export function createStateProxy<T extends object>(
         setPrototypeOf: (target, object) => {
             const result = Reflect.setPrototypeOf(target, object);
             handleUpdation({
-                type: 'setPrototypeOf',
+                type: 'SET_PROTOTYPE_OF',
                 path,
                 value: object,
                 timestamp: Date.now(),
