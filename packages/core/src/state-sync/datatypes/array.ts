@@ -1,342 +1,219 @@
 import type { StateOperation } from '../types.ts';
 
-export class ArrayWrapper<T> {
-    private _store: T[];
-    private _emit: (op: StateOperation) => void;
-    private _path: string[];
-
-    constructor(initial: T[] = [], emit: (op: StateOperation) => void, path: string[]) {
-        this._emit = emit;
-        this._path = path;
-        this._store = [...initial];
-    }
-
-    get raw(): T[] {
-        return this._store;
-    }
-
-    get path(): string[] {
-        return this._path;
-    }
-
-    get length(): number {
-        return this._store.length;
-    }
-
-    push(...items: T[]): number {
-        const start = this._store.length;
-        const now = Date.now();
-        for (let i = 0; i < items.length; i++) {
-            this._emit({
-                type: 'ARRAY_INSERT',
-                path: [...this._path, String(start + i)],
-                value: items[i],
-                timestamp: now,
-            });
-        }
-        return Array.prototype.push.apply(this._store, items);
-    }
-
-    pop(): T | undefined {
-        if (this._store.length === 0) return undefined;
-        const idx = this._store.length - 1;
-        const value = this._store[idx];
-        this._emit({
-            type: 'ARRAY_DELETE',
-            path: [...this._path, String(idx)],
-            value,
-            timestamp: Date.now(),
-        });
-        return Array.prototype.pop.call(this._store);
-    }
-
-    shift(): T | undefined {
-        if (this._store.length === 0) return undefined;
-        const value = this._store[0];
-        this._emit({
-            type: 'ARRAY_DELETE',
-            path: [...this._path, '0'],
-            value,
-            timestamp: Date.now(),
-        });
-        return Array.prototype.shift.call(this._store);
-    }
-
-    unshift(...items: T[]): number {
-        const now = Date.now();
-        for (let i = 0; i < items.length; i++) {
-            this._emit({
-                type: 'ARRAY_INSERT',
-                path: [...this._path, String(i)],
-                value: items[i],
-                timestamp: now,
-            });
-        }
-        return Array.prototype.unshift.apply(this._store, items);
-    }
-
-    splice(start: number, deleteCount?: number, ...items: T[]): T[] {
-        const len = this._store.length;
-        const actualStart = start < 0 ? Math.max(len + start, 0) : Math.min(start, len);
-        const actualDelete = deleteCount ?? len - actualStart;
-        const now = Date.now();
-
-        // Snapshot the values being removed BEFORE the mutation
-        const removed = this._store.slice(actualStart, actualStart + actualDelete);
-
-        for (let i = 0; i < removed.length; i++) {
-            this._emit({
-                type: 'ARRAY_DELETE',
-                path: [...this._path, String(actualStart)],
-                value: removed[i],
-                timestamp: now,
-            });
-        }
-        for (let i = 0; i < items.length; i++) {
-            this._emit({
-                type: 'ARRAY_INSERT',
-                path: [...this._path, String(actualStart + i)],
-                value: items[i],
-                timestamp: now,
-            });
-        }
-        return Array.prototype.splice.apply(this._store, [
-            actualStart,
-            actualDelete,
-            ...items,
-        ] as any);
-    }
-
-    sort(compareFn?: (a: T, b: T) => number): T[] {
-        Array.prototype.sort.call(this._store, compareFn);
-        this._emit({
-            type: 'ARRAY_REPLACE',
-            path: this._path,
-            value: [...this._store],
-            timestamp: Date.now(),
-        });
-        return this._store;
-    }
-
-    reverse(): T[] {
-        Array.prototype.reverse.call(this._store);
-        this._emit({
-            type: 'ARRAY_REPLACE',
-            path: this._path,
-            value: [...this._store],
-            timestamp: Date.now(),
-        });
-        return this._store;
-    }
-
-    fill(value: T, start?: number, end?: number): T[] {
-        Array.prototype.fill.call(this._store, value, start, end);
-        this._emit({
-            type: 'ARRAY_REPLACE',
-            path: this._path,
-            value: [...this._store],
-            timestamp: Date.now(),
-        });
-        return this._store;
-    }
-
-    copyWithin(target: number, start: number, end?: number): T[] {
-        Array.prototype.copyWithin.call(this._store, target, start, end);
-        this._emit({
-            type: 'ARRAY_REPLACE',
-            path: this._path,
-            value: [...this._store],
-            timestamp: Date.now(),
-        });
-        return this._store;
-    }
-
-    setIndex(index: number, value: T): void {
-        const oldLength = this._store.length;
-        const oldValue = this._store[index];
-        this._store[index] = value;
-
-        // Extension (was past end) → INSERT; otherwise → UPDATE
-        const isExtension = index >= oldLength;
-        this._emit({
-            type: isExtension ? 'ARRAY_INSERT' : 'ARRAY_UPDATE',
-            path: [...this._path, String(index)],
-            value,
-            timestamp: Date.now(),
-        });
-
-        // If extension caused length to grow, also emit a resize op
-        // (optional — consumers may or may not care about implicit resizes)
-        void oldValue; // explicit acknowledgment that we captured it
-    }
-
-    setLength(newLength: number): void {
-        const oldLength = this._store.length;
-        if (newLength === oldLength) return;
-        this._store.length = newLength;
-        this._emit({
-            type: 'ARRAY_RESIZE',
-            path: this._path,
-            value: newLength,
-            timestamp: Date.now(),
-        });
-    }
-
-    deleteIndex(index: number): boolean {
-        if (index < 0 || index >= this._store.length) return false;
-        const value = this._store[index];
-        // splice removes AND shifts subsequent elements (native JS delete semantics)
-        this.splice(index, 1);
-        void value;
-        return true;
-    }
-
-    toJSON(): T[] {
-        return [...this._store];
-    }
-
-    map<U>(callbackfn: (value: T, index: number, array: T[]) => U, thisArg?: any): U[] {
-        return this._store.map(callbackfn, thisArg);
-    }
-
-    filter(predicate: (value: T, index: number, array: T[]) => unknown, thisArg?: any): T[] {
-        return this._store.filter(predicate, thisArg);
-    }
-
-    find(predicate: (value: T, index: number, obj: T[]) => unknown, thisArg?: any): T | undefined {
-        return this._store.find(predicate, thisArg);
-    }
-
-    findIndex(predicate: (value: T, index: number, obj: T[]) => unknown, thisArg?: any): number {
-        return this._store.findIndex(predicate, thisArg);
-    }
-
-    includes(searchElement: T, fromIndex?: number): boolean {
-        return this._store.includes(searchElement, fromIndex);
-    }
-
-    indexOf(searchElement: T, fromIndex?: number): number {
-        return this._store.indexOf(searchElement, fromIndex);
-    }
-
-    lastIndexOf(searchElement: T, fromIndex?: number): number {
-        return this._store.lastIndexOf(searchElement, fromIndex);
-    }
-
-    every(predicate: (value: T, index: number, array: T[]) => unknown, thisArg?: any): boolean {
-        return this._store.every(predicate, thisArg);
-    }
-
-    some(predicate: (value: T, index: number, array: T[]) => unknown, thisArg?: any): boolean {
-        return this._store.some(predicate, thisArg);
-    }
-
-    reduce<U>(
-        callbackfn: (previousValue: U, currentValue: T, currentIndex: number, array: T[]) => U,
-        initialValue: U,
-    ): U {
-        return this._store.reduce(callbackfn, initialValue);
-    }
-
-    reduceRight<U>(
-        callbackfn: (previousValue: U, currentValue: T, currentIndex: number, array: T[]) => U,
-        initialValue: U,
-    ): U {
-        return this._store.reduceRight(callbackfn, initialValue);
-    }
-
-    forEach(callbackfn: (value: T, index: number, array: T[]) => void, thisArg?: any): void {
-        this._store.forEach(callbackfn, thisArg);
-    }
-
-    slice(start?: number, end?: number): T[] {
-        return this._store.slice(start, end);
-    }
-
-    concat(...items: (T | readonly T[])[]): T[] {
-        return this._store.concat(...items);
-    }
-
-    join(separator?: string): string {
-        return this._store.join(separator);
-    }
-
-    toString(): string {
-        return this._store.toString();
-    }
-
-    toLocaleString(): string {
-        return this._store.toLocaleString();
-    }
-
-    flat<A = T>(depth?: number): A[] {
-        return (this._store as any).flat(depth);
-    }
-
-    flatMap<U>(
-        callback: (value: T, index: number, array: T[]) => U | readonly U[],
-        thisArg?: any,
-    ): U[] {
-        return (this._store as any).flatMap(callback, thisArg);
-    }
-
-    at(index: number): T | undefined {
-        return (this._store as any).at(index);
-    }
-
-    entries(): IterableIterator<[number, T]> {
-        return this._store.entries();
-    }
-
-    keys(): IterableIterator<number> {
-        return this._store.keys();
-    }
-
-    values(): IterableIterator<T> {
-        return this._store.values();
-    }
-}
-
 export function createArrayWrapper<T>(
     initial: T[] = [],
     emit: (op: StateOperation) => void,
     path: string[] = [],
 ): T[] {
-    const wrapper = new ArrayWrapper<T>(initial, emit, path);
+    const store = [...initial];
 
-    return new Proxy(wrapper, {
+    return new Proxy(store, {
         get(target, property, receiver): any {
+            // Numeric index access
             if (typeof property === 'string' && /^\d+$/.test(property)) {
-                const index = Number(property);
-                return target.raw[index];
+                return target[Number(property)];
             }
 
+            // Symbol.iterator
             if (property === Symbol.iterator) {
-                return target.raw[Symbol.iterator].bind(target.raw);
+                return target[Symbol.iterator].bind(target);
             }
 
+            // toJSON for serialization
             if (property === 'toJSON') {
-                return () => [...target.raw];
+                return () => [...target];
             }
 
+            // Mutation methods that emit operations
+            if (property === 'push') {
+                return (...items: T[]) => {
+                    const start = target.length;
+                    const now = Date.now();
+                    for (let i = 0; i < items.length; i++) {
+                        emit({
+                            type: 'ARRAY_INSERT',
+                            path: [...path, String(start + i)],
+                            value: items[i],
+                            timestamp: now,
+                        });
+                    }
+                    return Array.prototype.push.apply(target, items);
+                };
+            }
+
+            if (property === 'pop') {
+                return () => {
+                    if (target.length === 0) return undefined;
+                    const idx = target.length - 1;
+                    const value = target[idx];
+                    emit({
+                        type: 'ARRAY_DELETE',
+                        path: [...path, String(idx)],
+                        value,
+                        timestamp: Date.now(),
+                    });
+                    return Array.prototype.pop.call(target);
+                };
+            }
+
+            if (property === 'shift') {
+                return () => {
+                    if (target.length === 0) return undefined;
+                    const value = target[0];
+                    emit({
+                        type: 'ARRAY_DELETE',
+                        path: [...path, '0'],
+                        value,
+                        timestamp: Date.now(),
+                    });
+                    return Array.prototype.shift.call(target);
+                };
+            }
+
+            if (property === 'unshift') {
+                return (...items: T[]) => {
+                    const now = Date.now();
+                    for (let i = 0; i < items.length; i++) {
+                        emit({
+                            type: 'ARRAY_INSERT',
+                            path: [...path, String(i)],
+                            value: items[i],
+                            timestamp: now,
+                        });
+                    }
+                    return Array.prototype.unshift.apply(target, items);
+                };
+            }
+
+            if (property === 'splice') {
+                return (start: number, deleteCount?: number, ...items: T[]) => {
+                    const len = target.length;
+                    const actualStart = start < 0 ? Math.max(len + start, 0) : Math.min(start, len);
+                    const actualDelete = deleteCount ?? len - actualStart;
+                    const now = Date.now();
+
+                    // Snapshot removed values
+                    const removed = target.slice(actualStart, actualStart + actualDelete);
+
+                    // Emit deletes
+                    for (let i = 0; i < removed.length; i++) {
+                        emit({
+                            type: 'ARRAY_DELETE',
+                            path: [...path, String(actualStart)],
+                            value: removed[i],
+                            timestamp: now,
+                        });
+                    }
+
+                    // Emit inserts
+                    for (let i = 0; i < items.length; i++) {
+                        emit({
+                            type: 'ARRAY_INSERT',
+                            path: [...path, String(actualStart + i)],
+                            value: items[i],
+                            timestamp: now,
+                        });
+                    }
+
+                    return Array.prototype.splice.apply(target, [
+                        actualStart,
+                        actualDelete,
+                        ...items,
+                    ] as any);
+                };
+            }
+
+            if (property === 'sort') {
+                return (compareFn?: (a: T, b: T) => number) => {
+                    Array.prototype.sort.call(target, compareFn);
+                    emit({
+                        type: 'ARRAY_REPLACE',
+                        path,
+                        value: [...target],
+                        timestamp: Date.now(),
+                    });
+                    return target;
+                };
+            }
+
+            if (property === 'reverse') {
+                return () => {
+                    Array.prototype.reverse.call(target);
+                    emit({
+                        type: 'ARRAY_REPLACE',
+                        path,
+                        value: [...target],
+                        timestamp: Date.now(),
+                    });
+                    return target;
+                };
+            }
+
+            if (property === 'fill') {
+                return (value: T, start?: number, end?: number) => {
+                    Array.prototype.fill.call(target, value, start, end);
+                    emit({
+                        type: 'ARRAY_REPLACE',
+                        path,
+                        value: [...target],
+                        timestamp: Date.now(),
+                    });
+                    return target;
+                };
+            }
+
+            if (property === 'copyWithin') {
+                return (targetIdx: number, start: number, end?: number) => {
+                    Array.prototype.copyWithin.call(target, targetIdx, start, end);
+                    emit({
+                        type: 'ARRAY_REPLACE',
+                        path,
+                        value: [...target],
+                        timestamp: Date.now(),
+                    });
+                    return target;
+                };
+            }
+
+            // Read-only methods pass through unchanged
             const value = Reflect.get(target, property, receiver);
-            if (typeof value === 'function' && typeof property === 'string') {
+            if (typeof value === 'function') {
                 return value.bind(target);
             }
             return value;
         },
 
         set(target, property, value): boolean {
+            // Indexed assignment
             if (typeof property === 'string' && /^\d+$/.test(property)) {
-                target.setIndex(Number(property), value);
+                const index = Number(property);
+                const isExtension = index >= target.length;
+                target[index] = value;
+                emit({
+                    type: isExtension ? 'ARRAY_INSERT' : 'ARRAY_UPDATE',
+                    path: [...path, String(index)],
+                    value,
+                    timestamp: Date.now(),
+                });
                 return true;
             }
 
+            // Length assignment
             if (property === 'length') {
-                target.setLength(value);
+                const oldLength = target.length;
+                if (value !== oldLength) {
+                    target.length = value;
+                    emit({
+                        type: 'ARRAY_RESIZE',
+                        path,
+                        value,
+                        timestamp: Date.now(),
+                    });
+                }
                 return true;
             }
 
+            // Other properties pass through
             return Reflect.set(target, property, value);
         },
 
@@ -349,40 +226,28 @@ export function createArrayWrapper<T>(
 
         deleteProperty(target, property): boolean {
             if (typeof property === 'string' && /^\d+$/.test(property)) {
-                target.deleteIndex(Number(property));
+                const index = Number(property);
+                if (index < 0 || index >= target.length) return false;
+                const value = target[index];
+                // Use splice to remove and shift elements
+                target.splice(index, 1);
+                emit({
+                    type: 'ARRAY_DELETE',
+                    path: [...path, String(index)],
+                    value,
+                    timestamp: Date.now(),
+                });
                 return true;
             }
             return Reflect.deleteProperty(target, property);
         },
 
         ownKeys(target): (string | symbol)[] {
-            const indices: string[] = [];
-            for (let i = 0; i < target.length; i++) indices.push(String(i));
-            return [...indices, 'length'];
+            return Reflect.ownKeys(target);
         },
 
         getOwnPropertyDescriptor(target, property): PropertyDescriptor | undefined {
-            if (typeof property === 'string' && /^\d+$/.test(property)) {
-                const index = Number(property);
-                if (index < target.length) {
-                    return {
-                        value: target.raw[index],
-                        writable: true,
-                        enumerable: true,
-                        configurable: true,
-                    };
-                }
-                return undefined;
-            }
-            if (property === 'length') {
-                return {
-                    value: target.length,
-                    writable: true,
-                    enumerable: false,
-                    configurable: true,
-                };
-            }
             return Reflect.getOwnPropertyDescriptor(target, property);
         },
-    }) as unknown as T[];
+    });
 }

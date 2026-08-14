@@ -131,7 +131,7 @@ describe('Array method mutations', () => {
         expect(ops.map((o) => o.value)).toEqual(['a', 'b', 'c']);
     });
 
-    test('pop emits ARRAY_REMOVE with the removed value', () => {
+    test('pop emits ARRAY_DELETE with the removed value', () => {
         const { ops, trackOp } = makeTracker();
         const state = createState({ tasks: ['a', 'b', 'c'] }, trackOp);
 
@@ -141,7 +141,7 @@ describe('Array method mutations', () => {
         expect(state.tasks).toEqual(['a', 'b']);
         expect(ops).toHaveLength(1);
         expect(ops[0]).toMatchObject({
-            type: 'ARRAY_REMOVE',
+            type: 'ARRAY_DELETE',
             path: ['tasks', '2'],
             value: 'c',
         });
@@ -184,7 +184,7 @@ describe('Array method mutations', () => {
         expect(ops[1]).toMatchObject({ type: 'ARRAY_INSERT', path: ['tasks', '1'], value: 'b' });
     });
 
-    test('splice(remove-only) emits ARRAY_REMOVEs in sequence', () => {
+    test('splice(remove-only) emits ARRAY_DELETEs in sequence', () => {
         const { ops, trackOp } = makeTracker();
         const state = createState({ tasks: ['a', 'b', 'c', 'd'] }, trackOp);
 
@@ -193,8 +193,8 @@ describe('Array method mutations', () => {
         expect(removed).toEqual(['b', 'c']);
         expect(state.tasks).toEqual(['a', 'd']);
         expect(ops).toHaveLength(2);
-        expect(ops[0]).toMatchObject({ type: 'ARRAY_REMOVE', path: ['tasks', '1'], value: 'b' });
-        expect(ops[1]).toMatchObject({ type: 'ARRAY_REMOVE', path: ['tasks', '1'], value: 'c' }); // shifts
+        expect(ops[0]).toMatchObject({ type: 'ARRAY_DELETE', path: ['tasks', '1'], value: 'b' });
+        expect(ops[1]).toMatchObject({ type: 'ARRAY_DELETE', path: ['tasks', '1'], value: 'c' }); // shifts
     });
 
     test('splice(insert-only) emits ARRAY_INSERTs', () => {
@@ -218,7 +218,7 @@ describe('Array method mutations', () => {
         expect(state.tasks).toEqual(['a', 'x', 'y', 'c']);
         // 1 remove at index 1 ('b'), then inserts at 1 ('x') and 2 ('y')
         expect(ops).toHaveLength(3);
-        expect(ops[0]).toMatchObject({ type: 'ARRAY_REMOVE', path: ['tasks', '1'], value: 'b' });
+        expect(ops[0]).toMatchObject({ type: 'ARRAY_DELETE', path: ['tasks', '1'], value: 'b' });
         expect(ops[1]).toMatchObject({ type: 'ARRAY_INSERT', path: ['tasks', '1'], value: 'x' });
         expect(ops[2]).toMatchObject({ type: 'ARRAY_INSERT', path: ['tasks', '2'], value: 'y' });
     });
