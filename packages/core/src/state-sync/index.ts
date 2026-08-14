@@ -1,3 +1,6 @@
+import { createArrayWrapper } from './datatypes/array.ts';
+import { createMapWrapper } from './datatypes/map.ts';
+import { createSetWrapper } from './datatypes/set.ts';
 import type { StateOperation } from './types.ts';
 
 export function createState<T extends object>(obj: T, onUpdate?: (op: StateOperation) => void) {
@@ -20,16 +23,27 @@ export function createStateProxy<T extends object>(
             const value = Reflect.get(target, property);
 
             if (value !== null && typeof value === 'object') {
+                if (value instanceof Date || value instanceof RegExp) {
+                    return value;
+                }
+
                 if (proxyCache.has(value)) {
                     return proxyCache.get(value);
                 }
 
-                const childProxy = createStateProxy(
-                    value,
-                    onUpdate,
-                    [...path, String(property)],
-                    proxyCache,
-                );
+                const childPath = [...path, String(property)];
+                let childProxy;
+
+                if (Array.isArray(value)) {
+                    childProxy = createArrayWrapper(value, handleUpdation, childPath);
+                } else if (value instanceof Map) {
+                    childProxy = createMapWrapper(value, handleUpdation, childPath);
+                } else if (value instanceof Set) {
+                    childProxy = createSetWrapper(value, handleUpdation, childPath);
+                } else {
+                    childProxy = createStateProxy(value, onUpdate, childPath, proxyCache);
+                }
+
                 proxyCache.set(value, childProxy);
                 return childProxy;
             }
@@ -37,11 +51,15 @@ export function createStateProxy<T extends object>(
             return value;
         },
         set: (target, property, value) => {
+            if (typeof property === 'symbol') {
+                return Reflect.set(target, property, value);
+            }
+
             const result = Reflect.set(target, property, value);
             const fullPath = [...path, String(property)];
 
             handleUpdation({
-                type: 'set',
+                type: 'SET',
                 path: fullPath,
                 value,
                 timestamp: Date.now(),
@@ -50,21 +68,18 @@ export function createStateProxy<T extends object>(
             return result;
         },
         has: (target, property) => {
-            const result = Reflect.has(target, property);
-            handleUpdation({
-                type: 'has',
-                path: [...path, String(property)],
-                value: result,
-                timestamp: Date.now(),
-            });
-            return result;
+            return Reflect.has(target, property);
         },
 
         deleteProperty: (target, property) => {
+            if (!Reflect.has(target, property)) {
+                return Reflect.deleteProperty(target, property);
+            }
+
             const value = Reflect.get(target, property);
             const result = Reflect.deleteProperty(target, property);
             handleUpdation({
-                type: 'deleteProperty',
+                type: 'DELETE_PROPERTY',
                 path: [...path, String(property)],
                 value,
                 timestamp: Date.now(),
@@ -73,20 +88,13 @@ export function createStateProxy<T extends object>(
         },
 
         ownKeys: (target) => {
-            const keys = Reflect.ownKeys(target);
-            handleUpdation({
-                type: 'ownKeys',
-                path,
-                value: keys,
-                timestamp: Date.now(),
-            });
-            return keys;
+            return Reflect.ownKeys(target);
         },
 
         defineProperty: (target, property, attributes) => {
             const result = Reflect.defineProperty(target, property, attributes);
             handleUpdation({
-                type: 'defineProperty',
+                type: 'DEFINE_PROPERTY',
                 path: [...path, String(property)],
                 value: attributes,
                 timestamp: Date.now(),
@@ -95,20 +103,13 @@ export function createStateProxy<T extends object>(
         },
 
         getOwnPropertyDescriptor: (target, property) => {
-            const descriptor = Reflect.getOwnPropertyDescriptor(target, property);
-            handleUpdation({
-                type: 'getOwnPropertyDescriptor',
-                path: [...path, String(property)],
-                value: descriptor,
-                timestamp: Date.now(),
-            });
-            return descriptor;
+            return Reflect.getOwnPropertyDescriptor(target, property);
         },
 
         preventExtensions: (target) => {
             const result = Reflect.preventExtensions(target);
             handleUpdation({
-                type: 'preventExtensions',
+                type: 'PREVENT_EXTENSIONS',
                 path,
                 value: null,
                 timestamp: Date.now(),
@@ -117,31 +118,17 @@ export function createStateProxy<T extends object>(
         },
 
         isExtensible: (target) => {
-            const result = Reflect.isExtensible(target);
-            handleUpdation({
-                type: 'isExtensible',
-                path,
-                value: result,
-                timestamp: Date.now(),
-            });
-            return result;
+            return Reflect.isExtensible(target);
         },
 
         getPrototypeOf: (target) => {
-            const proto = Reflect.getPrototypeOf(target);
-            handleUpdation({
-                type: 'getPrototypeOf',
-                path,
-                value: proto,
-                timestamp: Date.now(),
-            });
-            return proto;
+            return Reflect.getPrototypeOf(target);
         },
 
         setPrototypeOf: (target, object) => {
             const result = Reflect.setPrototypeOf(target, object);
             handleUpdation({
-                type: 'setPrototypeOf',
+                type: 'SET_PROTOTYPE_OF',
                 path,
                 value: object,
                 timestamp: Date.now(),

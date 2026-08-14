@@ -82,6 +82,23 @@ export class SetWrapper<T> {
     get [Symbol.toStringTag]() {
         return 'Set';
     }
+
+    __applyRemote(op: StateOperation) {
+        switch (op.type) {
+            case 'SET_ADD': {
+                Set.prototype.add.apply(this._store, [op.value]);
+                break;
+            }
+            case 'SET_REMOVE': {
+                Set.prototype.delete.apply(this._store, [op.value]);
+                break;
+            }
+            case 'SET_CLEAR': {
+                Set.prototype.clear.apply(this._store);
+                break;
+            }
+        }
+    }
 }
 
 export function createSetWrapper<T>(
