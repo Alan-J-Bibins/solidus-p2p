@@ -88,6 +88,25 @@ export class MapWrapper<K, V> {
     get [Symbol.toStringTag]() {
         return 'Map';
     }
+
+    __applyRemote(op: any) {
+        switch (op.type) {
+            case 'MAP_SET': {
+                const key = op.key ?? op.path[op.path.length - 1];
+                Map.prototype.set.apply(this._store, [key, op.value]);
+                break;
+            }
+            case 'MAP_DELETE': {
+                const key = op.key ?? op.path[op.path.length - 1];
+                Map.prototype.delete.apply(this._store, [key]);
+                break;
+            }
+            case 'MAP_CLEAR': {
+                Map.prototype.clear.apply(this._store);
+                break;
+            }
+        }
+    }
 }
 
 export function createMapWrapper<K, V>(

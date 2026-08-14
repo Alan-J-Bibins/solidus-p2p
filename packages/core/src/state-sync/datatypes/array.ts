@@ -175,6 +175,38 @@ export function createArrayWrapper<T>(
                 };
             }
 
+            if (property === '__applyRemote') {
+                return (op: StateOperation) => {
+                    switch (op.type) {
+                        case 'ARRAY_INSERT': {
+                            const index = Number(op.path[op.path.length - 1]);
+                            target.splice(index, 0, op.value);
+                            break;
+                        }
+                        case 'ARRAY_DELETE': {
+                            const index = Number(op.path[op.path.length - 1]);
+                            target.splice(index, 1);
+                            break;
+                        }
+                        case 'ARRAY_UPDATE': {
+                            const index = Number(op.path[op.path.length - 1]);
+                            target[index] = op.value;
+                            break;
+                        }
+                        case 'ARRAY_REPLACE': {
+                            // Replace entire array contents
+                            target.length = 0;
+                            target.push(...op.value);
+                            break;
+                        }
+                        case 'ARRAY_RESIZE': {
+                            target.length = op.value;
+                            break;
+                        }
+                    }
+                };
+            }
+
             // Read-only methods pass through unchanged
             const value = Reflect.get(target, property, receiver);
             if (typeof value === 'function') {
@@ -227,9 +259,10 @@ export function createArrayWrapper<T>(
         deleteProperty(target, property): boolean {
             if (typeof property === 'string' && /^\d+$/.test(property)) {
                 const index = Number(property);
-                if (index < 0 || index >= target.length) return false;
+                // Out of bounds - return true (success) but emit nothing
+                if (index < 0 || index >= target.length) return true;
+
                 const value = target[index];
-                // Use splice to remove and shift elements
                 target.splice(index, 1);
                 emit({
                     type: 'ARRAY_DELETE',
@@ -241,7 +274,6 @@ export function createArrayWrapper<T>(
             }
             return Reflect.deleteProperty(target, property);
         },
-
         ownKeys(target): (string | symbol)[] {
             return Reflect.ownKeys(target);
         },

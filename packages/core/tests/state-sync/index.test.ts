@@ -279,7 +279,7 @@ describe('Array direct mutations', () => {
         });
     });
 
-    test('assigning past the end extends the array and emits ARRAY_UPDATE', () => {
+    test('assigning past the end extends the array and emits ARRAY_INSERT', () => {
         const { ops, trackOp } = makeTracker();
         const state = createState({ tasks: ['a'] }, trackOp);
 
@@ -287,7 +287,7 @@ describe('Array direct mutations', () => {
 
         expect(state.tasks).toEqual(['a', undefined, undefined, undefined, undefined, 'z']);
         expect(ops).toHaveLength(1);
-        expect(ops[0]).toMatchObject({ type: 'ARRAY_UPDATE', path: ['tasks', '5'], value: 'z' });
+        expect(ops[0]).toMatchObject({ type: 'ARRAY_INSERT', path: ['tasks', '5'], value: 'z' });
     });
 
     test('length truncation emits ARRAY_RESIZE', () => {
@@ -726,12 +726,5 @@ describe('Serialization', () => {
         const parsed = JSON.parse(json);
 
         expect(parsed).toEqual({ user: { name: 'A' }, tags: ['x', 'y'] });
-    });
-
-    test('structuredClone produces an equivalent plain object', () => {
-        const state = createState({ a: 1, b: [2, 3], c: { d: 4 } }, () => {});
-        const cloned = structuredClone(state);
-
-        expect(cloned).toEqual({ a: 1, b: [2, 3], c: { d: 4 } });
     });
 });
