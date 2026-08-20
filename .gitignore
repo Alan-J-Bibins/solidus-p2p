@@ -30,3 +30,4 @@ dist-ssr
 !.vscode/settings.json
 !.vscode/extensions.json
 /graphify-out
+/todo.md

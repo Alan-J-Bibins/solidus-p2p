@@ -36,6 +36,8 @@ export function solidus(config: SolidusConfig = {}): SolidusInstance {
                 onUpdate?.(op);
                 mergedConfig.onStateOperation?.(op);
             };
+
+            events.emit('state:init', obj);
             return _createState(obj, composed) as T;
         },
 

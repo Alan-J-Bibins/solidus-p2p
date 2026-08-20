@@ -8,24 +8,6 @@ export interface YjsPluginOptions {
 }
 
 export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
-    function resolveYjsContainer(
-        doc: Y.Doc,
-        path: string[],
-    ): { parent: Y.Map<any> | Y.Array<any>; key: string | number } {
-        let current: any = doc.getMap('root');
-
-        for (let i = 0; i < path.length - 1; i++) {
-            const segment = path[i];
-            current =
-                current instanceof Y.Array ? current.get(Number(segment)) : current.get(segment);
-        }
-
-        const lastSegment = path[path.length - 1];
-        const key = current instanceof Y.Array ? Number(lastSegment) : lastSegment;
-
-        return { parent: current, key };
-    }
-
     function serializeValue(value: any, doc: Y.Doc): any {
         if (value === null || value === undefined) return value;
         if (typeof value !== 'object') return value;
@@ -63,6 +45,42 @@ export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
             yMap.set(k, serializeValue(v, doc));
         }
         return yMap;
+    }
+
+    function resolveYjsContainer(
+        doc: Y.Doc,
+        path: string[],
+    ): { parent: Y.Map<any> | Y.Array<any>; key: string | number } {
+        let current: any = doc.getMap('root');
+
+        for (let i = 0; i < path.length - 1; i++) {
+            const segment = path[i];
+            current =
+                current instanceof Y.Array ? current.get(Number(segment)) : current.get(segment);
+        }
+
+        const lastSegment = path[path.length - 1];
+        const key = current instanceof Y.Array ? Number(lastSegment) : lastSegment;
+
+        return { parent: current, key };
+    }
+
+    function resolveYjsTarget(doc: Y.Doc, path: string[]): Y.Map<any> | Y.Array<any> {
+        let current: any = doc.getMap('root');
+
+        for (const segment of path) {
+            current =
+                current instanceof Y.Array ? current.get(Number(segment)) : current.get(segment);
+        }
+
+        return current;
+    }
+
+    function initializeYjsFromState(doc: Y.Doc, state: any) {
+        const rootMap = doc.getMap('root');
+        for (const [key, value] of Object.entries(state)) {
+            rootMap.set(key, serializeValue(value, doc));
+        }
     }
 
     function applyOperation(doc: Y.Doc, op: StateOperation) {
@@ -104,7 +122,7 @@ export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
                 break;
 
             case 'ARRAY_REPLACE': {
-                const arr = parent as Y.Array<any>;
+                const arr = resolveYjsTarget(doc, op.path) as Y.Array<any>;
                 arr.delete(0, arr.length);
                 arr.insert(
                     0,
@@ -114,7 +132,7 @@ export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
             }
 
             case 'ARRAY_RESIZE': {
-                const arr = parent as Y.Array<any>;
+                const arr = resolveYjsTarget(doc, op.path) as Y.Array<any>;
                 const newLen = op.value as number;
                 if (newLen < arr.length) {
                     arr.delete(newLen, arr.length - newLen);
@@ -133,13 +151,13 @@ export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
                 break;
 
             case 'MAP_CLEAR': {
-                const map = parent as Y.Map<any>;
+                const map = resolveYjsTarget(doc, op.path) as Y.Map<any>;
                 for (const k of [...map.keys()]) map.delete(k);
                 break;
             }
 
             case 'SET_ADD': {
-                const arr = parent as Y.Array<any>;
+                const arr = resolveYjsTarget(doc, op.path) as Y.Array<any>;
                 if (!arr.toArray().includes(op.value)) {
                     arr.insert(arr.length, [op.value]);
                 }
@@ -147,15 +165,17 @@ export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
             }
 
             case 'SET_REMOVE': {
-                const arr = parent as Y.Array<any>;
+                const arr = resolveYjsTarget(doc, op.path) as Y.Array<any>;
                 const idx = arr.toArray().indexOf(op.value);
                 if (idx !== -1) arr.delete(idx, 1);
                 break;
             }
 
-            case 'SET_CLEAR':
-                (parent as Y.Array<any>).delete(0, (parent as Y.Array<any>).length);
+            case 'SET_CLEAR': {
+                const arr = resolveYjsTarget(doc, op.path) as Y.Array<any>;
+                arr.delete(0, arr.length);
                 break;
+            }
         }
     }
 
@@ -171,6 +191,12 @@ export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
                     '[solidus-p2p] yjs is required for the yjs() plugin but was not found.\nInstall it with: npm install yjs',
                 );
             }
+
+            events.on('state:init', (initialState: any) => {
+                doc.transact(() => {
+                    initializeYjsFromState(doc, initialState);
+                });
+            });
 
             events.on('state:operation', (op: StateOperation) => {
                 doc.transact(() => {

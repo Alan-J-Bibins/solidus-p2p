@@ -783,7 +783,7 @@ describe('Checking if paths are appropriately managed and created', () => {
             },
         });
         expect(ops).toHaveLength(2);
-        expect(ops.at(0)?.path).toStrictEqual(['a', 'ab']);
+        expect(ops.at(0)?.path).toStrictEqual(['a', 'aa']);
         expect(ops.at(1)?.path).toStrictEqual(['a', 'ab', 'aba']);
     });
 });
