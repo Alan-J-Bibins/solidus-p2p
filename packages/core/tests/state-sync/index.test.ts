@@ -728,3 +728,62 @@ describe('Serialization', () => {
         expect(parsed).toEqual({ user: { name: 'A' }, tags: ['x', 'y'] });
     });
 });
+
+describe('Checking if paths are appropriately managed and created', () => {
+    test('top-level primitive', () => {
+        const { ops, trackOp } = makeTracker();
+        const state = createState({ a: 'something', isActive: true }, trackOp);
+        state.a = 'somethingElse';
+        state.isActive = false;
+        expect(ops).toHaveLength(2);
+        expect(ops.at(0)?.path).toStrictEqual(['a']);
+        expect(ops.at(1)?.path).toStrictEqual(['isActive']);
+    });
+
+    test('top-level array push', () => {
+        const { ops, trackOp } = makeTracker();
+        const state = createState({ a: [1, 2, 3, 4] }, trackOp);
+        state.a.push(5);
+        expect(ops).toHaveLength(1);
+        expect(ops.at(0)?.path).toStrictEqual(['a', '4']);
+    });
+
+    test('top-level array delete index', () => {
+        const { ops, trackOp } = makeTracker();
+        const state = createState({ a: [1, 2, 3, 4] }, trackOp);
+        delete state.a[3];
+        expect(state).toEqual({
+            a: [1, 2, 3],
+        });
+        expect(ops).toHaveLength(1);
+        expect(ops.at(0)?.path).toStrictEqual(['a', '3']);
+    });
+
+    test('nested operations', () => {
+        const { ops, trackOp } = makeTracker();
+        const state = createState(
+            {
+                a: {
+                    aa: 1,
+                    ab: {
+                        aba: 2,
+                    },
+                },
+            },
+            trackOp,
+        );
+        state.a.aa = 2;
+        state.a.ab.aba = 5;
+        expect(state).toEqual({
+            a: {
+                aa: 2,
+                ab: {
+                    aba: 5,
+                },
+            },
+        });
+        expect(ops).toHaveLength(2);
+        expect(ops.at(0)?.path).toStrictEqual(['a', 'aa']);
+        expect(ops.at(1)?.path).toStrictEqual(['a', 'ab', 'aba']);
+    });
+});
