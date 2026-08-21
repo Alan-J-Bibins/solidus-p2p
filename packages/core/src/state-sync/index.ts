@@ -2,6 +2,7 @@ import { createArrayWrapper } from './datatypes/array.ts';
 import { createMapWrapper } from './datatypes/map.ts';
 import { createSetWrapper } from './datatypes/set.ts';
 import type { StateOperation } from './types.ts';
+export { applyOperation } from './apply-operation.ts';
 
 export function createState<T extends object>(obj: T, onUpdate?: (op: StateOperation) => void) {
     const proxyCache = new WeakMap<object, any>();

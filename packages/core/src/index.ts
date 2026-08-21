@@ -2,6 +2,9 @@ import { createState as _createState } from './state-sync/index.ts';
 import type { StateOperation } from './state-sync/types.ts';
 import type { SolidusConfig, SolidusEvents, SolidusInstance } from './types.ts';
 
+export { createNetworkingPlugin } from './networking/index.ts';
+export type { NetworkingConfig, NetworkHandle } from './networking/index.ts';
+
 export function solidus(config: SolidusConfig = {}): SolidusInstance {
     const handlers: Record<string, Function[]> = {};
     const events: SolidusEvents = {
