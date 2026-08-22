@@ -1,60 +1,83 @@
+import { solidus, createNetworkingPlugin } from './../../../packages/core/src';
+
+// ';
 import './style.css';
-import heroImg from './assets/hero.png';
-import typescriptLogo from './assets/typescript.svg';
-import viteLogo from './assets/vite.svg';
-import { setupCounter } from './counter.ts';
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-<section id="center">
-  <div class="hero">
-    <img src="${heroImg}" class="base" width="170" height="179">
-    <img src="${typescriptLogo}" class="framework" alt="TypeScript logo"/>
-    <img src="${viteLogo}" class="vite" alt="Vite logo" />
+  <div style="font-family: sans-serif; max-width: 480px; margin: 40px auto;">
+    <h2>Solidus P2P State Sync Test</h2>
+    <label>Signaling server (host:port)</label>
+    <input id="server" type="text" value="192.168.1.42:8080" style="width: 100%; margin-bottom: 8px;" />
+    <label>Room ID (must match on both computers)</label>
+    <input id="room" type="text" value="test-room" style="width: 100%; margin-bottom: 8px;" />
+    <div style="margin-bottom: 8px;">
+      <button id="offerBtn">Connect as Offerer</button>
+      <button id="answerBtn">Connect as Answerer</button>
+    </div>
+    <div id="status" style="color: gray; margin-bottom: 8px;">Not connected</div>
+    <div style="margin-bottom: 8px;">
+      <button id="incrementBtn" disabled>count++</button>
+      <span id="countDisplay">count: 0</span>
+    </div>
+    <pre id="log" style="background: #111; color: #0f0; padding: 8px; height: 200px; overflow-y: auto;"></pre>
   </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/main.ts</code> and save to test <code>HMR</code></p>
-  </div>
-  <button id="counter" type="button" class="counter"></button>
-</section>
-
-<div class="ticks"></div>
-
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#documentation-icon"></use></svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank">
-          <img class="logo" src="${viteLogo}" alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://www.typescriptlang.org" target="_blank">
-          <img class="button-icon" src="${typescriptLogo}" alt="">
-          Learn more
-        </a>
-      </li>
-    </ul>
-  </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#social-icon"></use></svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li><a href="https://github.com/vitejs/vite" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#github-icon"></use></svg>GitHub</a></li>
-      <li><a href="https://chat.vite.dev/" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#discord-icon"></use></svg>Discord</a></li>
-      <li><a href="https://x.com/vite_js" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#x-icon"></use></svg>X.com</a></li>
-      <li><a href="https://bsky.app/profile/vite.dev" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#bluesky-icon"></use></svg>Bluesky</a></li>
-    </ul>
-  </div>
-</section>
-
-<div class="ticks"></div>
-<section id="spacer"></section>
 `;
 
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!);
+const serverInput = document.querySelector<HTMLInputElement>('#server')!;
+const roomInput = document.querySelector<HTMLInputElement>('#room')!;
+const offerBtn = document.querySelector<HTMLButtonElement>('#offerBtn')!;
+const answerBtn = document.querySelector<HTMLButtonElement>('#answerBtn')!;
+const statusEl = document.querySelector<HTMLDivElement>('#status')!;
+const incrementBtn = document.querySelector<HTMLButtonElement>('#incrementBtn')!;
+const countDisplay = document.querySelector<HTMLSpanElement>('#countDisplay')!;
+const logEl = document.querySelector<HTMLPreElement>('#log')!;
+
+function log(line: string): void {
+    logEl.textContent += `${line}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+}
+
+const rawState = { count: 0 };
+const instance = solidus({ plugins: [createNetworkingPlugin()] });
+
+const state = instance.createState(rawState, (op) => {
+    log(`local op: ${JSON.stringify(op)}`);
+    countDisplay.textContent = `count: ${rawState.count}`;
+});
+
+instance.config; // just to show it's accessible; remove if unused
+
+async function connect(role: 'offerer' | 'answerer'): Promise<void> {
+    offerBtn.disabled = true;
+    answerBtn.disabled = true;
+    statusEl.textContent = 'Connecting...';
+
+    const network = instance.create({
+        type: 'peer-network',
+        config: {
+            signalingServer: serverInput.value.trim(),
+            room: roomInput.value.trim(),
+            role,
+            target: rawState,
+        },
+    });
+
+    network.onMessage(() => {
+        // Networking plugin already applies remote ops internally; this is just
+        // to refresh the UI whenever *any* message arrives from the peer.
+        countDisplay.textContent = `count: ${rawState.count}`;
+        log(`remote update received, count is now ${rawState.count}`);
+    });
+
+    await network.waitUntilOpen();
+    statusEl.textContent = 'Connected! State will now sync automatically.';
+    incrementBtn.disabled = false;
+}
+
+offerBtn.addEventListener('click', () => connect('offerer'));
+answerBtn.addEventListener('click', () => connect('answerer'));
+
+incrementBtn.addEventListener('click', () => {
+    state.count++; // <-- this is the only line that matters: mutate the proxy,
+    //     everything else (broadcast, remote apply) is automatic
+});

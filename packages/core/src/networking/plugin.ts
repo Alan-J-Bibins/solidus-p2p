@@ -1,4 +1,3 @@
-import { applyOperation } from '../state-sync/apply-operation.ts';
 import type { StateOperation } from '../state-sync/types.ts';
 import { WebRtcPeer } from './peer-connection.ts';
 import { SignalingClient } from './signaling-client.ts';
@@ -46,7 +45,6 @@ export function createNetworkingPlugin(): Plugin {
                 try {
                     const parsed = JSON.parse(raw);
                     if (parsed.kind === 'state-op') {
-                        applyOperation(config.target, parsed.op as StateOperation);
                         events.emit('state:remote-operation', parsed.op);
                     }
                 } catch {
