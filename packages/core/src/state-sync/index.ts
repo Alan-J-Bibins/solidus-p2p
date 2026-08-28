@@ -7,7 +7,7 @@ export function createState<T extends object>(obj: T, onUpdate?: (op: StateOpera
     const proxyCache = new WeakMap<object, any>();
     return createStateProxy(obj, onUpdate, [], proxyCache);
 }
-
+export { applyOperation } from './apply-operation.ts';
 export function createStateProxy<T extends object>(
     initial: T,
     onUpdate?: (op: StateOperation) => void,

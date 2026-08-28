@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { WebSocketServer, type WebSocket } from 'ws';
 
 export interface TestSignalingServer {
@@ -7,36 +9,63 @@ export interface TestSignalingServer {
 
 export function startTestSignalingServer(): Promise<TestSignalingServer> {
     return new Promise((resolve) => {
-        const rooms = new Map<string, Set<WebSocket>>();
-        const wss = new WebSocketServer({ port: 0 }); // 0 = OS assigns a free port
+        const rooms = new Map<string, Map<string, WebSocket>>();
+        const wss = new WebSocketServer({ port: 0 });
 
         wss.on('connection', (socket, request) => {
             const url = new URL(request.url ?? '', 'http://localhost');
             const roomId = url.searchParams.get('room');
+            if (!roomId) return socket.close(1008, 'Missing ?room=');
 
-            if (!roomId) {
-                socket.close(1008, 'Missing ?room= query param');
-                return;
-            }
-
+            const peerId = randomUUID();
             let room = rooms.get(roomId);
-            if (!room) {
-                room = new Set();
-                rooms.set(roomId, room);
+            if (!room) rooms.set(roomId, (room = new Map()));
+
+            const existingPeers = Array.from(room.keys());
+            room.set(peerId, socket);
+
+            socket.send(JSON.stringify({ kind: 'welcome', peerId, peers: existingPeers }));
+
+            for (const [otherId, otherSocket] of room) {
+                if (otherId !== peerId && otherSocket.readyState === otherSocket.OPEN) {
+                    otherSocket.send(JSON.stringify({ kind: 'peer-joined', peerId }));
+                }
             }
-            room.add(socket);
 
             socket.on('message', (data) => {
-                for (const peer of room!) {
-                    if (peer !== socket && peer.readyState === peer.OPEN) {
-                        peer.send(data.toString());
+                let message: any;
+                try {
+                    message = JSON.parse(data.toString());
+                } catch {
+                    return;
+                }
+                if (message.kind === 'signal' && message.to) {
+                    const target = room!.get(message.to);
+                    if (!target) return;
+                    if (target.readyState === target.OPEN) {
+                        target.send(
+                            JSON.stringify({
+                                kind: 'signal',
+                                from: peerId,
+                                to: message.to,
+                                signal: message.signal,
+                            }),
+                        );
                     }
                 }
             });
 
             socket.on('close', () => {
-                room!.delete(socket);
-                if (room!.size === 0) rooms.delete(roomId);
+                room!.delete(peerId);
+                if (room!.size === 0) {
+                    rooms.delete(roomId);
+                } else {
+                    for (const [, otherSocket] of room!) {
+                        if (otherSocket.readyState === otherSocket.OPEN) {
+                            otherSocket.send(JSON.stringify({ kind: 'peer-left', peerId }));
+                        }
+                    }
+                }
             });
         });
 
@@ -46,9 +75,7 @@ export function startTestSignalingServer(): Promise<TestSignalingServer> {
             resolve({
                 port,
                 close: () =>
-                    new Promise<void>((res, rej) => {
-                        wss.close((err) => (err ? rej(err) : res()));
-                    }),
+                    new Promise<void>((res, rej) => wss.close((err) => (err ? rej(err) : res()))),
             });
         });
     });

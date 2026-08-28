@@ -1,14 +1,14 @@
-import type { SignalingMessage } from './types.ts';
+import type { RTCSignal } from './types.ts';
 
 export interface WebRtcPeerOptions {
     iceServers?: RTCIceServer[];
-    onSignal: (message: SignalingMessage) => void;
+    onSignal: (signal: RTCSignal) => void;
 }
 
 export class WebRtcPeer {
     readonly connection: RTCPeerConnection;
     private dataChannel: RTCDataChannel | null = null;
-    private onSignal: (message: SignalingMessage) => void;
+    private onSignal: (signal: RTCSignal) => void;
     private messageHandlers: Array<(data: string) => void> = [];
     private openResolvers: Array<() => void> = [];
     private isOpen = false;
@@ -47,21 +47,21 @@ export class WebRtcPeer {
         this.onSignal({ type: 'offer', sdp: offer });
     }
 
-    async handleSignal(message: SignalingMessage): Promise<void> {
-        switch (message.type) {
+    async handleSignal(signal: RTCSignal): Promise<void> {
+        switch (signal.type) {
             case 'offer': {
-                await this.connection.setRemoteDescription(message.sdp);
+                await this.connection.setRemoteDescription(signal.sdp);
                 const answer = await this.connection.createAnswer();
                 await this.connection.setLocalDescription(answer);
                 this.onSignal({ type: 'answer', sdp: answer });
                 break;
             }
             case 'answer': {
-                await this.connection.setRemoteDescription(message.sdp);
+                await this.connection.setRemoteDescription(signal.sdp);
                 break;
             }
             case 'ice-candidate': {
-                await this.connection.addIceCandidate(message.candidate);
+                await this.connection.addIceCandidate(signal.candidate);
                 break;
             }
         }
@@ -73,7 +73,7 @@ export class WebRtcPeer {
 
     send(data: string): void {
         if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-            throw new Error('[solidus-p2p] Data channel is not open');
+            throw new Error('[solidus-p2p webrtc] Data channel is not open');
         }
         this.dataChannel.send(data);
     }
