@@ -1,4 +1,4 @@
-import type { RTCSignal } from './types.ts';
+import type { RTCSignal } from '../types.ts';
 
 export interface WebRtcPeerOptions {
     iceServers?: RTCIceServer[];

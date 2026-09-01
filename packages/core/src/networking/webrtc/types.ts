@@ -1,4 +1,13 @@
-export type RTCSignal =
-    | { type: 'offer'; sdp: RTCSessionDescriptionInit }
-    | { type: 'answer'; sdp: RTCSessionDescriptionInit }
-    | { type: 'ice-candidate'; candidate: RTCIceCandidateInit };
+import type { BaseNetworkingConfig, SignalingServerConfig } from '../types.ts';
+
+export type WebRTCResources = {
+    'peer-network': WebRTCTransportConfig;
+    'signaling-server': SignalingServerConfig;
+};
+
+export interface WebRTCTransportConfig extends BaseNetworkingConfig {
+    target: object;
+    signalingServer: string;
+    room: string;
+    iceServers?: RTCIceServer[];
+}

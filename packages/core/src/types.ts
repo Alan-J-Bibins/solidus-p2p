@@ -2,22 +2,33 @@
 import type { StateOperation } from './state-sync/types.ts';
 
 export type SolidusEvents = {
+    /**
+     * For setting up event listeners
+     */
     on: (event: string, handler: Function) => void;
+
+    /**
+     * For emitting events with any payload
+     */
     emit: (event: string, ...args: any[]) => void;
 };
 
-export type SolidusPlugin = {
+export type SolidusPlugin<TResources extends Record<string, any> = Record<string, any>> = {
     name: string;
     setup?: (events: SolidusEvents) => void;
 
-    provides?: string[];
-    create?: (type: string, options: any, events: SolidusEvents) => any;
+    provides?: (keyof TResources & string)[];
+    create?: <K extends keyof TResources & string>(
+        type: K,
+        options: { type: K; label?: string; config?: TResources[K] },
+        events: SolidusEvents,
+    ) => any;
 };
 
 /**
  * Configuration for Solidus' Operational Engine
  */
-export type SolidusConfig = {
+export type SolidusConfig<TPlugins extends SolidusPlugin<any>[] = SolidusPlugin<any>[]> = {
     /**
      * Global hook called on every state mutation across all createState()
      * instances produced by this solidus() call.
@@ -27,10 +38,18 @@ export type SolidusConfig = {
     /**
      * Reserved for future plugins / middleware.
      */
-    plugins?: SolidusPlugin[];
+    plugins?: TPlugins;
 };
 
-export type SolidusInstance = {
+type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void
+    ? I
+    : never;
+
+export type MergedResources<TPlugins extends SolidusPlugin<any>[]> = TPlugins extends []
+    ? Record<string, any>
+    : UnionToIntersection<TPlugins[number] extends SolidusPlugin<infer R> ? R : never>;
+
+export type SolidusInstance<TResources extends Record<string, any> = Record<string, any>> = {
     /** The resolved config this instance was created with. */
     readonly config: Readonly<SolidusConfig>;
 
@@ -40,8 +59,10 @@ export type SolidusInstance = {
      */
     createState<T extends object>(obj: T, onUpdate?: (op: StateOperation) => void): T;
 
-    /**
-     * Create any solidus resource
-     */
-    create: (resourceConfig: { type: string; label?: string; config?: any }) => any;
+    /** Type-safe create method - config is inferred from the resource type */
+    create: <K extends keyof TResources & string>(resourceConfig: {
+        type: K;
+        label?: string;
+        config?: TResources[K];
+    }) => any;
 };
