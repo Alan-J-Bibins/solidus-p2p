@@ -76,6 +76,7 @@ interface DocState {
 // Module-level references for cleanup
 let solidusInstance: ReturnType<typeof solidus> | null = null;
 let docState: DocState | null = null;
+let rawDocState: DocState | null = null;
 let network: NetworkHandle | null = null;
 let isApplyingRemoteChange = false;
 
@@ -139,17 +140,22 @@ connectBtn.addEventListener('click', async () => {
         solidusInstance = solidus({
             plugins: [webrtc(), yjs()],
             onStateOperation: (op) => {
-                console.log('[Solidus] onStateOperation fired, op:', op);
-                // This fires for all operations, but we only want to update Quill
-                // when the change came from a remote peer (not our own edits)
-                if (docState && !isApplyingRemoteChange) {
+                console.log('[Solidus] onStateOperation fired (local), op:', op);
+            },
+            onRemoteOperation: (op, peerId) => {
+                console.log('[Solidus] onRemoteOperation fired from peer:', peerId, 'op:', op);
+                if (docState) {
                     console.log(
                         '[Solidus] Applying remote change to Quill, content length:',
                         docState.content.length,
                     );
+                    console.log('[Solidus] docState.content value:', docState.content);
+
                     isApplyingRemoteChange = true;
                     quill.root.innerHTML = docState.content;
                     isApplyingRemoteChange = false;
+
+                    // Update debug display
                     updateStateDisplay();
                 }
             },
@@ -157,7 +163,7 @@ connectBtn.addEventListener('click', async () => {
         console.log('[Connect] Solidus instance created');
 
         // Create the raw state object first
-        const rawDocState = {
+        rawDocState = {
             content: quill.root.innerHTML,
             version: 0,
         };
@@ -232,6 +238,7 @@ disconnectBtn.addEventListener('click', () => {
     }
     solidusInstance = null;
     docState = null;
+    rawDocState = null;
 
     connectionStatus.textContent = 'Disconnected';
     connectionStatus.classList.remove('connected', 'connecting');

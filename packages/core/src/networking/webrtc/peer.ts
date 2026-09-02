@@ -35,8 +35,22 @@ export class WebRtcPeer {
             this.openResolvers.forEach((resolve) => resolve());
             this.openResolvers = [];
         };
-        channel.onmessage = (event) => {
-            this.messageHandlers.forEach((handler) => handler(event.data));
+        channel.onmessage = async (event) => {
+            let data = event.data;
+            console.log(
+                '[WebRtcPeer] Received message, type:',
+                typeof data,
+                'constructor:',
+                data?.constructor?.name,
+            );
+            if (data instanceof Blob) {
+                data = await data.text();
+                console.log('[WebRtcPeer] Converted Blob to string:', data);
+            } else if (data instanceof ArrayBuffer) {
+                data = new TextDecoder().decode(data);
+                console.log('[WebRtcPeer] Converted ArrayBuffer to string:', data);
+            }
+            this.messageHandlers.forEach((handler) => handler(data));
         };
     }
 

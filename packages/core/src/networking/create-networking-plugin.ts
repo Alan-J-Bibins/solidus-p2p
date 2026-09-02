@@ -1,3 +1,5 @@
+import { applyOperation } from '../state-sync/apply-operation.ts';
+import type { StateOperation } from '../state-sync/types.ts';
 import type { SolidusPlugin } from '../types.ts';
 import type {
     BaseNetworkingConfig,
@@ -15,6 +17,7 @@ export function createNetworkingPlugin<
     additionallyProvides?: Record<string, Function>,
 ): SolidusPlugin<Resources> {
     const activeTransports = new Set<NetworkTransport>();
+    let rawStateRegistry: Map<string, any>;
 
     return {
         name: pluginName,
@@ -23,8 +26,9 @@ export function createNetworkingPlugin<
             ...(additionallyProvides ? Object.keys(additionallyProvides) : []),
         ] as (keyof Resources & string)[],
 
-        setup(events) {
-            events.on('state:broadcast', (op: Uint8Array) => {
+        setup(events, registry) {
+            rawStateRegistry = registry;
+            events.on('state:operation', (op: StateOperation) => {
                 const payload = JSON.stringify({ kind: 'state-update', op });
                 activeTransports.forEach((transport) => {
                     try {
@@ -49,13 +53,36 @@ export function createNetworkingPlugin<
                 activeTransports.add(transport);
 
                 transport.onMessage((peerId, raw) => {
+                    console.log('[Networking] Raw message received:', typeof raw, raw);
                     try {
                         const parsed = JSON.parse(raw);
+                        console.log('[Networking] Parsed message:', parsed);
                         if (parsed.kind === 'state-update') {
-                            events.emit('state:remote-operation', { peerId, op: parsed.op });
+                            const op = parsed.op as StateOperation;
+                            console.log(
+                                '[Networking] Received remote operation:',
+                                op,
+                                'from peer:',
+                                peerId,
+                            );
+                            console.log(
+                                '[Networking] Raw state registry size:',
+                                rawStateRegistry.size,
+                            );
+                            for (const [key, rawState] of rawStateRegistry.entries()) {
+                                console.log(
+                                    '[Networking] Applying to raw state:',
+                                    key,
+                                    'before:',
+                                    JSON.stringify(rawState),
+                                );
+                                applyOperation(rawState, op);
+                                console.log('[Networking] After apply:', JSON.stringify(rawState));
+                            }
+                            events.emit('state:remote-applied', { peerId, op });
                         }
-                    } catch {
-                        console.log('Malformed/unexpected payload from a peer.');
+                    } catch (err) {
+                        console.log('[Networking] Failed to parse message:', err, 'raw:', raw);
                     }
                 });
 

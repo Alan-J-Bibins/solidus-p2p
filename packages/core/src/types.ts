@@ -15,7 +15,7 @@ export type SolidusEvents = {
 
 export type SolidusPlugin<TResources extends Record<string, any> = Record<string, any>> = {
     name: string;
-    setup?: (events: SolidusEvents, proxyRegistry?: Map<string, any>) => void;
+    setup?: (events: SolidusEvents, rawStateRegistry: Map<string, any>) => void;
 
     provides?: (keyof TResources & string)[];
     create?: <K extends keyof TResources & string>(
@@ -30,10 +30,16 @@ export type SolidusPlugin<TResources extends Record<string, any> = Record<string
  */
 export type SolidusConfig<TPlugins extends SolidusPlugin<any>[] = SolidusPlugin<any>[]> = {
     /**
-     * Global hook called on every state mutation across all createState()
+     * Global hook called on every local state mutation across all createState()
      * instances produced by this solidus() call.
      */
     onStateOperation?: (op: StateOperation) => void;
+
+    /**
+     * Global hook called when a remote operation is applied to the state.
+     * Use this to update UI components (like editors) when state changes come from other peers.
+     */
+    onRemoteOperation?: (op: StateOperation, peerId: string) => void;
 
     /**
      * Reserved for future plugins / middleware.
