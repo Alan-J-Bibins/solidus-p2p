@@ -152,7 +152,11 @@ connectBtn.addEventListener('click', async () => {
                     console.log('[Solidus] docState.content value:', docState.content);
 
                     isApplyingRemoteChange = true;
-                    quill.root.innerHTML = docState.content;
+                    const selection = quill.getSelection();
+                    const delta = quill.clipboard.convert({ html: docState.content });
+                    quill.setContents(delta, 'api');
+                    if (selection) quill.setSelection(selection.index, selection.length);
+                    quill.root.focus();
                     isApplyingRemoteChange = false;
 
                     // Update debug display

@@ -538,7 +538,11 @@ connectBtn.addEventListener('click', async () => {
             if (content !== docState.content) {
                 console.log('[Yjs] Remote update received, content length:', content.length);
                 isApplyingRemoteChange = true;
-                quill.root.innerHTML = content;
+                const selection = quill.getSelection();
+                const delta = quill.clipboard.convert({ html: content });
+                quill.setContents(delta, 'api');
+                if (selection) quill.setSelection(selection.index, selection.length);
+                quill.root.focus();
                 isApplyingRemoteChange = false;
 
                 docState.content = content;
@@ -556,7 +560,11 @@ connectBtn.addEventListener('click', async () => {
 
             console.log('[Yjs] yMap observed remote change, content length:', content.length);
             isApplyingRemoteChange = true;
-            quill.root.innerHTML = content;
+            const selection = quill.getSelection();
+            const delta = quill.clipboard.convert({ html: content });
+            quill.setContents(delta, 'api');
+            if (selection) quill.setSelection(selection.index, selection.length);
+            quill.root.focus();
             isApplyingRemoteChange = false;
 
             docState.content = content;
