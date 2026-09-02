@@ -3,7 +3,7 @@ const instance = solidus({ plugins: [webrtc()] });
 const signalingServer = await instance.create({
     type: 'signaling-server',
     config: {
-        port: 8000,
+        port: 8080,
         hooks: {
             onConnection: (peerId, roomId) => {
                 console.log(

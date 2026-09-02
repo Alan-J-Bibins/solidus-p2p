@@ -15,7 +15,7 @@ export type SolidusEvents = {
 
 export type SolidusPlugin<TResources extends Record<string, any> = Record<string, any>> = {
     name: string;
-    setup?: (events: SolidusEvents) => void;
+    setup?: (events: SolidusEvents, proxyRegistry?: Map<string, any>) => void;
 
     provides?: (keyof TResources & string)[];
     create?: <K extends keyof TResources & string>(

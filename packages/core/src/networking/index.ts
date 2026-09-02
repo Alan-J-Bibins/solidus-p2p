@@ -10,8 +10,6 @@ export type {
     NetworkHandle,
     BaseNetworkingConfig,
     PeerId,
-    SignalingServerConfig,
-    SignalingServerHooks,
     RTCSignal,
 } from './types.ts';
 

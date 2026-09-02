@@ -10,7 +10,8 @@
     },
     "dependencies": {
         "@solidus-p2p/core": "^0.0.0",
-        "quill": "^2.0.3"
+        "quill": "^2.0.3",
+        "yjs": "^13.6.32"
     },
     "devDependencies": {
         "typescript": "~6.0.2",

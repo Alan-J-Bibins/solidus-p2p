@@ -1,6 +1,4 @@
-import type { StateOperation } from '../state-sync/types.ts';
 import type { SolidusPlugin } from '../types.ts';
-import { applyOperation } from './../state-sync/apply-operation.ts';
 import type {
     BaseNetworkingConfig,
     NetworkHandle,
@@ -26,8 +24,8 @@ export function createNetworkingPlugin<
         ] as (keyof Resources & string)[],
 
         setup(events) {
-            events.on('state:operation', (op: StateOperation) => {
-                const payload = JSON.stringify({ kind: 'state-op', op });
+            events.on('state:broadcast', (op: Uint8Array) => {
+                const payload = JSON.stringify({ kind: 'state-update', op });
                 activeTransports.forEach((transport) => {
                     try {
                         transport.broadcast(payload);
@@ -53,8 +51,7 @@ export function createNetworkingPlugin<
                 transport.onMessage((peerId, raw) => {
                     try {
                         const parsed = JSON.parse(raw);
-                        if (parsed.kind === 'state-op') {
-                            applyOperation(config.target, parsed.op as StateOperation);
+                        if (parsed.kind === 'state-update') {
                             events.emit('state:remote-operation', { peerId, op: parsed.op });
                         }
                     } catch {

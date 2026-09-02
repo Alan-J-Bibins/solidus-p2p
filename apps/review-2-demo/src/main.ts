@@ -2,6 +2,7 @@ import { solidus, webrtc, type NetworkHandle } from '@solidus-p2p/core';
 
 import 'quill/dist/quill.snow.css';
 import './style.css';
+import { yjs } from '@solidus-p2p/core/state-sync/integrations';
 import Quill from 'quill';
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
@@ -136,7 +137,7 @@ connectBtn.addEventListener('click', async () => {
         // Create solidus instance with WebRTC plugin
         console.log('[Connect] Creating solidus instance...');
         solidusInstance = solidus({
-            plugins: [webrtc()],
+            plugins: [webrtc(), yjs()],
             onStateOperation: (op) => {
                 console.log('[Solidus] onStateOperation fired, op:', op);
                 // This fires for all operations, but we only want to update Quill

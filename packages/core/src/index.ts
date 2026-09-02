@@ -22,6 +22,7 @@ export function solidus<TPlugins extends SolidusPlugin<any>[]>(
     config: SolidusConfig<TPlugins> = {},
 ): SolidusInstance<MergedResources<TPlugins>> {
     const handlers: Record<string, Function[]> = {};
+    const proxyRegistry = new Map<string, any>();
 
     const events: SolidusEvents = {
         on: (event: string, handler: Function) => {
@@ -38,7 +39,7 @@ export function solidus<TPlugins extends SolidusPlugin<any>[]>(
     const plugins = mergedConfig.plugins ?? [];
 
     // Service plugins — run at initialization
-    plugins.forEach((plugin) => plugin.setup?.(events));
+    plugins.forEach((plugin) => plugin.setup?.(events, proxyRegistry));
 
     // Factory plugins — registry for on-demand resource creation
     const pluginMap = new Map<string, (typeof plugins)[number]>();
@@ -57,7 +58,11 @@ export function solidus<TPlugins extends SolidusPlugin<any>[]>(
             };
 
             events.emit('state:init', obj);
-            return _createState(obj, composed) as T;
+            const proxy = _createState(obj, composed) as T;
+
+            proxyRegistry.set(`state-abstraction-object-${proxyRegistry.size}`, proxy);
+
+            return proxy;
         },
 
         create(resourceConfig: { type: string; label?: string; config?: any }) {
