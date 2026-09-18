@@ -1,9 +1,14 @@
 import { createState as _createState } from './state-sync/index.ts';
 import type { StateOperation } from './state-sync/types.ts';
-import type { SolidusConfig, SolidusEvents, SolidusInstance } from './types.ts';
+import type {
+    MergedResources,
+    SolidusConfig,
+    SolidusEvents,
+    SolidusInstance,
+    SolidusPlugin,
+} from './types.ts';
 
-//The following 2 exports are exports for networking
-export { createNetworkingPlugin, createWebRTCNetworkingPlugin } from './networking/index.ts';
+export { createNetworkingPlugin, webrtc } from './networking/index.ts';
 export type {
     NetworkTransport,
     NetworkTransportFactory,
@@ -13,8 +18,12 @@ export type {
     WebRTCTransportConfig,
 } from './networking/index.ts';
 
-export function solidus(config: SolidusConfig = {}): SolidusInstance {
+export function solidus<TPlugins extends SolidusPlugin<any>[]>(
+    config: SolidusConfig<TPlugins> = {},
+): SolidusInstance<MergedResources<TPlugins>> {
     const handlers: Record<string, Function[]> = {};
+    const rawStateRegistry = new Map<string, any>();
+
     const events: SolidusEvents = {
         on: (event: string, handler: Function) => {
             if (!handlers[event]) handlers[event] = [];
@@ -30,7 +39,12 @@ export function solidus(config: SolidusConfig = {}): SolidusInstance {
     const plugins = mergedConfig.plugins ?? [];
 
     // Service plugins — run at initialization
-    plugins.forEach((plugin) => plugin.setup?.(events));
+    plugins.forEach((plugin) => plugin.setup?.(events, rawStateRegistry));
+
+    // Listen for remote operations applied by networking plugin
+    events.on('state:remote-applied', (data: { peerId: string; op: StateOperation }) => {
+        mergedConfig.onRemoteOperation?.(data.op, data.peerId);
+    });
 
     // Factory plugins — registry for on-demand resource creation
     const pluginMap = new Map<string, (typeof plugins)[number]>();
@@ -49,7 +63,11 @@ export function solidus(config: SolidusConfig = {}): SolidusInstance {
             };
 
             events.emit('state:init', obj);
-            return _createState(obj, composed) as T;
+            const proxy = _createState(obj, composed) as T;
+
+            rawStateRegistry.set(`raw-state-${rawStateRegistry.size}`, obj);
+
+            return proxy;
         },
 
         create(resourceConfig: { type: string; label?: string; config?: any }) {

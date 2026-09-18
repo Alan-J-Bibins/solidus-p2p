@@ -60,12 +60,15 @@ export class SignalingClient {
     onWelcome(handler: (peerId: string, existingPeers: string[]) => void): void {
         this.welcomeHandlers.push(handler);
     }
+
     onPeerJoined(handler: (peerId: string) => void): void {
         this.joinHandlers.push(handler);
     }
+
     onPeerLeft(handler: (peerId: string) => void): void {
         this.leaveHandlers.push(handler);
     }
+
     onSignal(handler: (from: string, signal: RTCSignal) => void): void {
         this.signalHandlers.push(handler);
     }

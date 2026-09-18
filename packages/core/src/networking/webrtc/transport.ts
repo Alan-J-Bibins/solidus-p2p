@@ -1,14 +1,7 @@
-import type { BaseNetworkingConfig, NetworkTransport } from '../types.ts';
-import { WebRtcPeer } from './peer-connection.ts';
-import { SignalingClient } from './signaling-client.ts';
-
-export interface WebRTCTransportConfig extends BaseNetworkingConfig {
-    /** e.g. "192.168.1.42:8080" or "wss://xxxx.ngrok-free.app" */
-    signalingServer: string;
-    /** All peers using the same room id connect to each other (full mesh). */
-    room: string;
-    iceServers?: RTCIceServer[];
-}
+import { SignalingClient } from '../signaling-client.ts';
+import type { NetworkTransport } from '../types.ts';
+import { WebRtcPeer } from './peer.ts';
+import type { WebRTCTransportConfig } from './types.ts';
 
 export function createWebRTCTransport(config: WebRTCTransportConfig): NetworkTransport {
     let localPeerId = '';
@@ -31,7 +24,7 @@ export function createWebRTCTransport(config: WebRTCTransportConfig): NetworkTra
             messageHandlers.forEach((handler) => handler(remotePeerId, data));
         });
 
-        peer.waitUntilOpen().then(() => {
+        void peer.waitUntilOpen().then(() => {
             joinHandlers.forEach((handler) => handler(remotePeerId));
         });
 
@@ -68,7 +61,6 @@ export function createWebRTCTransport(config: WebRTCTransportConfig): NetworkTra
                     signaling.waitUntilOpen().catch(reject);
                     signaling.onWelcome((peerId, existingPeers) => {
                         localPeerId = peerId;
-                        // We're the new joiner — initiate a connection to everyone already here.
                         existingPeers.forEach((id) => setupPeer(id, true));
                         resolve();
                     });
@@ -88,7 +80,7 @@ export function createWebRTCTransport(config: WebRTCTransportConfig): NetworkTra
                 try {
                     peer.send(data);
                 } catch {
-                    // That peer's channel isn't open yet — skip it, keep broadcasting to others.
+                    // That peer's channel isn't open yet — skip it
                 }
             });
         },

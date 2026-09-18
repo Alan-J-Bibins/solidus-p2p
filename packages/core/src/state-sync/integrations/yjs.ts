@@ -180,17 +180,14 @@ export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
     }
 
     let doc: Y.Doc;
+    let proxyRegistry: Map<string, any>;
+    let isApplyingRemote = false;
+
     return {
         name: 'yjs',
-        setup(events) {
-            try {
-                const Y = require('yjs') as typeof import('yjs');
-                doc = options.doc ?? new Y.Doc();
-            } catch {
-                throw new Error(
-                    '[solidus-p2p] yjs is required for the yjs() plugin but was not found.\nInstall it with: npm install yjs',
-                );
-            }
+        setup(events, registry) {
+            doc = options.doc ?? new Y.Doc();
+            proxyRegistry = registry ?? new Map<string, any>();
 
             events.on('state:init', (initialState: any) => {
                 doc.transact(() => {
@@ -199,14 +196,134 @@ export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
             });
 
             events.on('state:operation', (op: StateOperation) => {
+                if (isApplyingRemote) return; // ← skip if we're applying remote changes
                 doc.transact(() => {
                     applyOperation(doc, op);
-                });
+                }, 'local');
+            });
+
+            doc.getMap('root').observeDeep((yjsEvents, transaction) => {
+                if (transaction.origin === 'local') return; // skip local changes
+
+                isApplyingRemote = true;
+
+                // Get all proxies
+                const proxies = Array.from(proxyRegistry.values());
+
+                // For each proxy, diff against Y.Doc and apply differences
+                for (const proxy of proxies) {
+                    diffAndApply(doc, proxy);
+                }
+
+                isApplyingRemote = false;
+                void yjsEvents;
             });
 
             events.on('destroy', () => {
                 doc.destroy();
             });
+
+            doc.on('update', (update) => {
+                events.emit('state:broadcast', update);
+            });
+
+            events.on('state:remote-operation', (peerId: string, op: Uint8Array) => {
+                void peerId;
+                Y.applyUpdate(doc, op);
+            });
         },
     };
+}
+
+function diffAndApply(doc: Y.Doc, proxy: any): void {
+    const rootMap = doc.getMap('root');
+
+    // Walk each top-level key in the proxy
+    for (const key of Object.keys(proxy)) {
+        const yVal = rootMap.get(key);
+        const proxyVal = proxy[key];
+
+        diffNode(yVal, proxyVal, [key], proxy);
+    }
+}
+
+function diffNode(yNode: any, proxyNode: any, path: string[], rootProxy: any): void {
+    // If YJS has a primitive or the types differ, apply YJS value to proxy
+    if (yNode === null || yNode === undefined || typeof yNode !== 'object') {
+        setNestedValue(rootProxy, path, yNode);
+        return;
+    }
+
+    // If proxy has a primitive but YJS has an object, apply YJS value
+    if (proxyNode === null || proxyNode === undefined || typeof proxyNode !== 'object') {
+        setNestedValue(rootProxy, path, deserializeYjs(yNode));
+        return;
+    }
+
+    // Both are objects — recurse
+    if (yNode instanceof Y.Map) {
+        // Check for added/updated keys
+        for (const [key, yVal] of yNode.entries()) {
+            const proxyVal = proxyNode[key];
+            diffNode(yVal, proxyVal, [...path, key], rootProxy);
+        }
+
+        // Check for deleted keys
+        for (const key of Object.keys(proxyNode)) {
+            if (!yNode.has(key)) {
+                deleteNestedValue(rootProxy, [...path, key]);
+            }
+        }
+    } else if (yNode instanceof Y.Array) {
+        const yArr = yNode.toArray();
+        const proxyArr = proxyNode;
+
+        // Simple approach: if lengths differ or any element differs, replace entire array
+        if (
+            yArr.length !== proxyArr.length ||
+            yArr.some((yVal, i) => !deepEqual(yVal, proxyArr[i]))
+        ) {
+            setNestedValue(rootProxy, path, yArr.map(deserializeYjs));
+        }
+    }
+}
+
+function setNestedValue(obj: any, path: string[], value: any): void {
+    let current = obj;
+    for (let i = 0; i < path.length - 1; i++) {
+        current = current[path[i]];
+        if (current === null || current === undefined) return;
+    }
+    current[path[path.length - 1]] = value;
+}
+
+function deleteNestedValue(obj: any, path: string[]): void {
+    let current = obj;
+    for (let i = 0; i < path.length - 1; i++) {
+        current = current[path[i]];
+        if (current === null || current === undefined) return;
+    }
+    delete current[path[path.length - 1]];
+}
+
+function deserializeYjs(val: any): any {
+    if (val instanceof Y.Map) {
+        const obj: Record<string, any> = {};
+        for (const [k, v] of val.entries()) obj[k] = deserializeYjs(v);
+        return obj;
+    }
+    if (val instanceof Y.Array) {
+        return val.toArray().map(deserializeYjs);
+    }
+    return val;
+}
+
+function deepEqual(a: any, b: any): boolean {
+    if (a instanceof Y.Map || a instanceof Y.Array) {
+        a = deserializeYjs(a);
+    }
+    if (b instanceof Y.Map || b instanceof Y.Array) {
+        b = deserializeYjs(b);
+    }
+    return JSON.stringify(a) === JSON.stringify(b);
 }

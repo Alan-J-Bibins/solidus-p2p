@@ -1,34 +1,19 @@
-import type { SolidusPlugin } from '../types.ts';
-
 export type PeerId = string;
 
-/**
- * The contract any networking transport (WebRTC, a plain WebSocket relay,
- * libp2p, etc.) must implement to plug into solidus' networking plugin.
- * Open-source contributors add support for a new transport by implementing
- * this interface — see networking/webrtc/webrtc-transport.ts for the
- * reference implementation.
- */
+export type RTCSignal =
+    | { type: 'offer'; sdp: RTCSessionDescriptionInit }
+    | { type: 'answer'; sdp: RTCSessionDescriptionInit }
+    | { type: 'ice-candidate'; candidate: RTCIceCandidateInit };
+
 export interface NetworkTransport {
-    /** This peer's own id within the current room, once connected. */
     readonly localPeerId: PeerId;
-
-    /** Establish the connection (join the room / signaling channel). */
     connect(): Promise<void>;
-
-    /** Send data to one specific peer. */
     sendTo(peerId: PeerId, data: string): void;
-
-    /** Send data to every currently-connected peer. */
     broadcast(data: string): void;
-
-    /** Currently connected peer ids (excludes self). */
     getPeers(): PeerId[];
-
     onMessage(handler: (peerId: PeerId, data: string) => void): void;
     onPeerJoin(handler: (peerId: PeerId) => void): void;
     onPeerLeave(handler: (peerId: PeerId) => void): void;
-
     close(): void;
 }
 
@@ -46,14 +31,23 @@ export interface NetworkHandle {
     close(): void;
 }
 
-/** Base config every networking transport's config object must satisfy. */
 export interface BaseNetworkingConfig {
-    /**
-     * The RAW object originally passed into createState(obj, ...) — NOT the
-     * returned proxy. Required so incoming remote operations can be applied
-     * without re-triggering local broadcast.
-     */
     target: object;
 }
 
-export type Plugin = SolidusPlugin;
+export interface SignalingServerHooks {
+    onConnection?: (peerId: string, roomId: string) => void;
+    onDisconnection?: (peerId: string, roomId: string) => void;
+    onMessage?: (peerId: string, message: any) => void;
+    onSignalForward?: (from: string, to: string, signal: any) => void;
+    onRoomCreated?: (roomId: string) => void;
+    onRoomDestroyed?: (roomId: string) => void;
+    onError?: (error: Error, context?: string) => void;
+    onReady?: (port: number, host: string) => void;
+}
+
+export interface SignalingServerConfig {
+    port: number;
+    host?: string;
+    hooks?: SignalingServerHooks;
+}

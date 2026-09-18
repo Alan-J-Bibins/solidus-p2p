@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, expect, test } from 'vite-plus/test';
 
 import { solidus } from './../../src/index.ts';
-import { createWebRTCNetworkingPlugin } from './../../src/networking/index.ts';
+import { webrtc } from './../../src/networking/index.ts';
 import {
     startTestSignalingServer,
     type TestSignalingServer,
@@ -24,7 +24,7 @@ afterEach(() => {
 
 function joinRoom(room: string) {
     const raw = { count: 0 };
-    const instance = solidus({ plugins: [createWebRTCNetworkingPlugin()] });
+    const instance = solidus({ plugins: [webrtc()] });
     const state = instance.createState(raw);
     const network = instance.create({
         type: 'peer-network',

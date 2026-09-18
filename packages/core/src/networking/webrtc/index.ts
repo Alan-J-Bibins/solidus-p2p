@@ -1,16 +1,18 @@
 import { createNetworkingPlugin } from '../create-networking-plugin.ts';
-import { createWebRTCTransport, type WebRTCTransportConfig } from './webrtc-transport.ts';
+import type { SignalingServerConfig } from '../types.ts';
+import { createWebRTCTransport } from './transport.ts';
+import type { WebRTCResources, WebRTCTransportConfig } from './types.ts';
 
-/** The default, bundled networking plugin — WebRTC mesh over a signaling server. */
-export function createWebRTCNetworkingPlugin() {
-    return createNetworkingPlugin<WebRTCTransportConfig>(
+export function webrtc() {
+    return createNetworkingPlugin<WebRTCTransportConfig, WebRTCResources>(
         createWebRTCTransport,
         'networking-webrtc',
+        {
+            'signaling-server': async (resourceConfig: { config: SignalingServerConfig }) => {
+                // Dynamic import - only loads in Node.js environment
+                const { SignalingServer } = await import('../signaling-server.ts');
+                return new SignalingServer(resourceConfig.config);
+            },
+        },
     );
 }
-
-export { createWebRTCTransport } from './webrtc-transport.ts';
-export type { WebRTCTransportConfig } from './webrtc-transport.ts';
-export { WebRtcPeer } from './peer-connection.ts';
-export { SignalingClient } from './signaling-client.ts';
-export type { RTCSignal } from './types.ts';
