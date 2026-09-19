@@ -32,7 +32,7 @@ export function createNetworkingPlugin<
                 const payload = JSON.stringify({ kind: 'state-update', op });
                 activeTransports.forEach((transport) => {
                     try {
-                        transport.broadcast(payload);
+                        transport.broadcastState(payload);
                     } catch {
                         console.log('No open peers yet');
                     }
@@ -53,31 +53,12 @@ export function createNetworkingPlugin<
                 activeTransports.add(transport);
 
                 transport.onMessage((peerId, raw) => {
-                    console.log('[Networking] Raw message received:', typeof raw, raw);
                     try {
                         const parsed = JSON.parse(raw);
-                        console.log('[Networking] Parsed message:', parsed);
                         if (parsed.kind === 'state-update') {
                             const op = parsed.op as StateOperation;
-                            console.log(
-                                '[Networking] Received remote operation:',
-                                op,
-                                'from peer:',
-                                peerId,
-                            );
-                            console.log(
-                                '[Networking] Raw state registry size:',
-                                rawStateRegistry.size,
-                            );
-                            for (const [key, rawState] of rawStateRegistry.entries()) {
-                                console.log(
-                                    '[Networking] Applying to raw state:',
-                                    key,
-                                    'before:',
-                                    JSON.stringify(rawState),
-                                );
+                            for (const rawState of rawStateRegistry.values()) {
                                 applyOperation(rawState, op);
-                                console.log('[Networking] After apply:', JSON.stringify(rawState));
                             }
                             events.emit('state:remote-applied', { peerId, op });
                         }
@@ -100,7 +81,10 @@ export function createNetworkingPlugin<
                     },
                     send: (peerId, data) => transport.sendTo(peerId, data),
                     broadcast: (data) => transport.broadcast(data),
+                    broadcastState: (data) => transport.broadcastState(data),
+                    broadcastChunk: (chunk) => transport.broadcastChunk(chunk),
                     onMessage: (handler) => transport.onMessage(handler),
+                    onChunk: (handler) => transport.onChunk(handler),
                     onPeerJoin: (handler) => transport.onPeerJoin(handler),
                     onPeerLeave: (handler) => transport.onPeerLeave(handler),
                     waitUntilOpen: () => connectPromise,

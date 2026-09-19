@@ -5,13 +5,20 @@ export type RTCSignal =
     | { type: 'answer'; sdp: RTCSessionDescriptionInit }
     | { type: 'ice-candidate'; candidate: RTCIceCandidateInit };
 
+// NEW: a chunk is an array of primitives
+export type ChunkPrimitive = string | number | boolean | null;
+export type Chunk = ChunkPrimitive[];
+
 export interface NetworkTransport {
     readonly localPeerId: PeerId;
     connect(): Promise<void>;
     sendTo(peerId: PeerId, data: string): void;
     broadcast(data: string): void;
+    broadcastState(data: string): void; // NEW: high priority
+    broadcastChunk(chunk: Chunk): void; // NEW: low priority, guaranteed share
     getPeers(): PeerId[];
     onMessage(handler: (peerId: PeerId, data: string) => void): void;
+    onChunk(handler: (peerId: PeerId, chunk: Chunk) => void): void; // NEW
     onPeerJoin(handler: (peerId: PeerId) => void): void;
     onPeerLeave(handler: (peerId: PeerId) => void): void;
     close(): void;
@@ -24,7 +31,10 @@ export interface NetworkHandle {
     readonly peers: PeerId[];
     send(peerId: PeerId, data: string): void;
     broadcast(data: string): void;
+    broadcastState(data: string): void; // NEW
+    broadcastChunk(chunk: Chunk): void; // NEW
     onMessage(handler: (peerId: PeerId, data: string) => void): void;
+    onChunk(handler: (peerId: PeerId, chunk: Chunk) => void): void; // NEW
     onPeerJoin(handler: (peerId: PeerId) => void): void;
     onPeerLeave(handler: (peerId: PeerId) => void): void;
     waitUntilOpen(): Promise<void>;
