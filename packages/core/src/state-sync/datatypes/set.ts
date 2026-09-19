@@ -1,13 +1,21 @@
+import { AssetReferenceTracker } from '../asset/reference-tracker.ts';
 import type { StateOperation } from '../types.ts';
 
 export class SetWrapper<T> {
     private _store: Set<T>;
     private _emit: (op: StateOperation) => void;
     private _path: string[];
+    private _assetTracker?: AssetReferenceTracker;
 
-    constructor(initial: Set<T> = new Set(), emit: (op: StateOperation) => void, path: string[]) {
+    constructor(
+        initial: Set<T> = new Set(),
+        emit: (op: StateOperation) => void,
+        path: string[],
+        assetTracker?: AssetReferenceTracker,
+    ) {
         this._emit = emit;
         this._path = path;
+        this._assetTracker = assetTracker;
         this._store = new Set(initial);
     }
 
@@ -21,8 +29,13 @@ export class SetWrapper<T> {
             });
 
             Set.prototype.add.apply(this._store, [value]);
+
+            if (this._assetTracker) {
+                this._assetTracker.addState(value);
+            }
         }
-        return this; // Always return for chaining
+
+        return this;
     }
 
     delete(value: T) {
@@ -34,7 +47,13 @@ export class SetWrapper<T> {
                 timestamp: Date.now(),
             });
 
-            return Set.prototype.delete.apply(this._store, [value]);
+            const result = Set.prototype.delete.apply(this._store, [value]);
+
+            if (this._assetTracker) {
+                void this._assetTracker.removeState(value);
+            }
+
+            return result;
         }
 
         return false;
@@ -47,6 +66,12 @@ export class SetWrapper<T> {
             value: null,
             timestamp: Date.now(),
         });
+
+        if (this._assetTracker) {
+            for (const value of this._store) {
+                void this._assetTracker.removeState(value);
+            }
+        }
 
         return Set.prototype.clear.apply(this._store);
     }
@@ -87,13 +112,31 @@ export class SetWrapper<T> {
         switch (op.type) {
             case 'SET_ADD': {
                 Set.prototype.add.apply(this._store, [op.value]);
+
+                if (this._assetTracker) {
+                    this._assetTracker.addState(op.value);
+                }
+
                 break;
             }
+
             case 'SET_REMOVE': {
                 Set.prototype.delete.apply(this._store, [op.value]);
+
+                if (this._assetTracker) {
+                    void this._assetTracker.removeState(op.value);
+                }
+
                 break;
             }
+
             case 'SET_CLEAR': {
+                if (this._assetTracker) {
+                    for (const value of this._store) {
+                        void this._assetTracker.removeState(value);
+                    }
+                }
+
                 Set.prototype.clear.apply(this._store);
                 break;
             }
@@ -105,6 +148,7 @@ export function createSetWrapper<T>(
     initial: Set<T> = new Set(),
     emit: (op: StateOperation) => void,
     path: string[] = [],
+    assetTracker?: AssetReferenceTracker,
 ) {
-    return new SetWrapper<T>(initial, emit, path);
+    return new SetWrapper<T>(initial, emit, path, assetTracker);
 }
