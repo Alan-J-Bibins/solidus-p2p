@@ -1,9 +1,11 @@
+import { AssetReferenceTracker } from '../asset/reference-tracker.ts';
 import type { StateOperation } from '../types.ts';
 
 export function createArrayWrapper<T>(
     initial: T[] = [],
     emit: (op: StateOperation) => void,
     path: string[] = [],
+    assetTracker?: AssetReferenceTracker,
 ): T[] {
     const store = [...initial];
 
@@ -29,6 +31,7 @@ export function createArrayWrapper<T>(
                 return (...items: T[]) => {
                     const start = target.length;
                     const now = Date.now();
+
                     for (let i = 0; i < items.length; i++) {
                         emit({
                             type: 'ARRAY_INSERT',
@@ -37,42 +40,70 @@ export function createArrayWrapper<T>(
                             timestamp: now,
                         });
                     }
-                    return Array.prototype.push.apply(target, items);
+
+                    const result = Array.prototype.push.apply(target, items);
+
+                    if (assetTracker) {
+                        for (const item of items) {
+                            assetTracker.addState(item);
+                        }
+                    }
+
+                    return result;
                 };
             }
 
             if (property === 'pop') {
                 return () => {
                     if (target.length === 0) return undefined;
+
                     const idx = target.length - 1;
                     const value = target[idx];
+
                     emit({
                         type: 'ARRAY_DELETE',
                         path: [...path, String(idx)],
                         value,
                         timestamp: Date.now(),
                     });
-                    return Array.prototype.pop.call(target);
+
+                    const result = Array.prototype.pop.call(target);
+
+                    if (assetTracker) {
+                        void assetTracker.removeState(value);
+                    }
+
+                    return result;
                 };
             }
 
             if (property === 'shift') {
                 return () => {
                     if (target.length === 0) return undefined;
+
                     const value = target[0];
+
                     emit({
                         type: 'ARRAY_DELETE',
                         path: [...path, '0'],
                         value,
                         timestamp: Date.now(),
                     });
-                    return Array.prototype.shift.call(target);
+
+                    const result = Array.prototype.shift.call(target);
+
+                    if (assetTracker) {
+                        void assetTracker.removeState(value);
+                    }
+
+                    return result;
                 };
             }
 
             if (property === 'unshift') {
                 return (...items: T[]) => {
                     const now = Date.now();
+
                     for (let i = 0; i < items.length; i++) {
                         emit({
                             type: 'ARRAY_INSERT',
@@ -81,7 +112,16 @@ export function createArrayWrapper<T>(
                             timestamp: now,
                         });
                     }
-                    return Array.prototype.unshift.apply(target, items);
+
+                    const result = Array.prototype.unshift.apply(target, items);
+
+                    if (assetTracker) {
+                        for (const item of items) {
+                            assetTracker.addState(item);
+                        }
+                    }
+
+                    return result;
                 };
             }
 
@@ -89,7 +129,9 @@ export function createArrayWrapper<T>(
                 return (start: number, deleteCount?: number, ...items: T[]) => {
                     const len = target.length;
                     const actualStart = start < 0 ? Math.max(len + start, 0) : Math.min(start, len);
+
                     const actualDelete = deleteCount ?? len - actualStart;
+
                     const now = Date.now();
 
                     // Snapshot removed values
@@ -115,23 +157,37 @@ export function createArrayWrapper<T>(
                         });
                     }
 
-                    return Array.prototype.splice.apply(target, [
+                    const result = Array.prototype.splice.apply(target, [
                         actualStart,
                         actualDelete,
                         ...items,
                     ] as any);
+
+                    if (assetTracker) {
+                        for (const value of removed) {
+                            void assetTracker.removeState(value);
+                        }
+
+                        for (const item of items) {
+                            assetTracker.addState(item);
+                        }
+                    }
+
+                    return result;
                 };
             }
 
             if (property === 'sort') {
                 return (compareFn?: (a: T, b: T) => number) => {
                     Array.prototype.sort.call(target, compareFn);
+
                     emit({
                         type: 'ARRAY_REPLACE',
                         path,
                         value: [...target],
                         timestamp: Date.now(),
                     });
+
                     return target;
                 };
             }
@@ -139,38 +195,73 @@ export function createArrayWrapper<T>(
             if (property === 'reverse') {
                 return () => {
                     Array.prototype.reverse.call(target);
+
                     emit({
                         type: 'ARRAY_REPLACE',
                         path,
                         value: [...target],
                         timestamp: Date.now(),
                     });
+
                     return target;
                 };
             }
 
             if (property === 'fill') {
                 return (value: T, start?: number, end?: number) => {
+                    const oldValues = [...target];
+
                     Array.prototype.fill.call(target, value, start, end);
+
                     emit({
                         type: 'ARRAY_REPLACE',
                         path,
                         value: [...target],
                         timestamp: Date.now(),
                     });
+
+                    if (assetTracker) {
+                        for (const oldValue of oldValues) {
+                            void assetTracker.removeState(oldValue);
+                        }
+
+                        for (const newValue of target) {
+                            assetTracker.addState(newValue);
+                        }
+                    }
+
                     return target;
                 };
             }
 
             if (property === 'copyWithin') {
                 return (targetIdx: number, start: number, end?: number) => {
+                    const oldValues = [...target];
+
                     Array.prototype.copyWithin.call(target, targetIdx, start, end);
+
                     emit({
                         type: 'ARRAY_REPLACE',
                         path,
                         value: [...target],
                         timestamp: Date.now(),
                     });
+
+                    if (assetTracker) {
+                        /*
+                         * copyWithin only rearranges/reuses existing
+                         * values, so first remove all old references
+                         * and then add the resulting references.
+                         */
+                        for (const oldValue of oldValues) {
+                            void assetTracker.removeState(oldValue);
+                        }
+
+                        for (const newValue of target) {
+                            assetTracker.addState(newValue);
+                        }
+                    }
+
                     return target;
                 };
             }
@@ -180,27 +271,82 @@ export function createArrayWrapper<T>(
                     switch (op.type) {
                         case 'ARRAY_INSERT': {
                             const index = Number(op.path[op.path.length - 1]);
+
                             target.splice(index, 0, op.value);
+
+                            if (assetTracker) {
+                                assetTracker.addState(op.value);
+                            }
+
                             break;
                         }
+
                         case 'ARRAY_DELETE': {
                             const index = Number(op.path[op.path.length - 1]);
+
+                            const value = target[index];
+
                             target.splice(index, 1);
+
+                            if (assetTracker) {
+                                void assetTracker.removeState(value);
+                            }
+
                             break;
                         }
+
                         case 'ARRAY_UPDATE': {
                             const index = Number(op.path[op.path.length - 1]);
+
+                            const oldValue = target[index];
+
                             target[index] = op.value;
+
+                            if (assetTracker) {
+                                void assetTracker.removeState(oldValue);
+                                assetTracker.addState(op.value);
+                            }
+
                             break;
                         }
+
                         case 'ARRAY_REPLACE': {
                             // Replace entire array contents
+                            const oldValues = [...target];
+
                             target.length = 0;
                             target.push(...op.value);
+
+                            if (assetTracker) {
+                                for (const oldValue of oldValues) {
+                                    void assetTracker.removeState(oldValue);
+                                }
+
+                                for (const newValue of target) {
+                                    assetTracker.addState(newValue);
+                                }
+                            }
+
                             break;
                         }
+
                         case 'ARRAY_RESIZE': {
-                            target.length = op.value;
+                            const oldLength = target.length;
+
+                            if (op.value < oldLength) {
+                                const removed = target.slice(op.value);
+
+                                target.length = op.value;
+
+                                if (assetTracker) {
+                                    for (const value of removed) {
+                                        void assetTracker.removeState(value);
+                                    }
+                                }
+                            } else {
+                                target.length = op.value;
+                            }
+
                             break;
                         }
                     }
@@ -209,9 +355,11 @@ export function createArrayWrapper<T>(
 
             // Read-only methods pass through unchanged
             const value = Reflect.get(target, property, receiver);
+
             if (typeof value === 'function') {
                 return value.bind(target);
             }
+
             return value;
         },
 
@@ -220,28 +368,51 @@ export function createArrayWrapper<T>(
             if (typeof property === 'string' && /^\d+$/.test(property)) {
                 const index = Number(property);
                 const isExtension = index >= target.length;
+                const oldValue = target[index];
+
                 target[index] = value;
+
                 emit({
                     type: isExtension ? 'ARRAY_INSERT' : 'ARRAY_UPDATE',
                     path: [...path, String(index)],
                     value,
                     timestamp: Date.now(),
                 });
+
+                if (assetTracker) {
+                    if (!isExtension) {
+                        void assetTracker.removeState(oldValue);
+                    }
+
+                    assetTracker.addState(value);
+                }
+
                 return true;
             }
 
             // Length assignment
             if (property === 'length') {
                 const oldLength = target.length;
+
                 if (value !== oldLength) {
+                    const removed = value < oldLength ? target.slice(value) : [];
+
                     target.length = value;
+
                     emit({
                         type: 'ARRAY_RESIZE',
                         path,
                         value,
                         timestamp: Date.now(),
                     });
+
+                    if (assetTracker) {
+                        for (const oldValue of removed) {
+                            void assetTracker.removeState(oldValue);
+                        }
+                    }
                 }
+
                 return true;
             }
 
@@ -253,27 +424,40 @@ export function createArrayWrapper<T>(
             if (typeof property === 'string' && /^\d+$/.test(property)) {
                 return Number(property) < target.length;
             }
+
             return Reflect.has(target, property);
         },
 
         deleteProperty(target, property): boolean {
             if (typeof property === 'string' && /^\d+$/.test(property)) {
                 const index = Number(property);
+
                 // Out of bounds - return true (success) but emit nothing
-                if (index < 0 || index >= target.length) return true;
+                if (index < 0 || index >= target.length) {
+                    return true;
+                }
 
                 const value = target[index];
+
                 target.splice(index, 1);
+
                 emit({
                     type: 'ARRAY_DELETE',
                     path: [...path, String(index)],
                     value,
                     timestamp: Date.now(),
                 });
+
+                if (assetTracker) {
+                    void assetTracker.removeState(value);
+                }
+
                 return true;
             }
+
             return Reflect.deleteProperty(target, property);
         },
+
         ownKeys(target): (string | symbol)[] {
             return Reflect.ownKeys(target);
         },

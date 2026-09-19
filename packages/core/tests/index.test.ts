@@ -2,9 +2,10 @@ import { describe, test, expect } from 'vite-plus/test';
 import * as Y from 'yjs';
 
 import { solidus } from '../src/index.ts';
+import { AssetReferenceTracker } from '../src/state-sync/asset/reference-tracker.ts';
 import { Asset } from '../src/state-sync/index.ts';
+import { createState } from '../src/state-sync/index.ts';
 import { yjs } from '../src/state-sync/integrations/yjs.ts';
-
 describe('State Sync Functionality Test with YJs Integration', () => {
     // ═════════════════════════════════════════════════════════════
     // 1. BASIC OBJECT OPERATIONS
@@ -422,6 +423,84 @@ describe('State Sync Functionality Test with YJs Integration', () => {
         expect(targetState.asset?.size).toBe(2048);
         expect(targetState.asset?.type).toBe('image/jpeg');
         expect(targetState.asset?.name).toBe('second.jpg');
+    });
+    test('tracks Assets in the initial state', () => {
+        const tracker = new AssetReferenceTracker();
+
+        const asset = new Asset('asset-123', 1024, 'image/png');
+
+        createState(
+            {
+                image: asset,
+            },
+            undefined,
+            tracker,
+        );
+
+        expect(tracker.count('asset-123')).toBe(1);
+    });
+    test('updates Asset references when a property is replaced', async () => {
+        const tracker = new AssetReferenceTracker();
+
+        const asset1 = new Asset('asset-1', 100, 'image/png');
+        const asset2 = new Asset('asset-2', 200, 'image/jpeg');
+
+        const state = createState(
+            {
+                image: asset1,
+            },
+            undefined,
+            tracker,
+        );
+
+        expect(tracker.count('asset-1')).toBe(1);
+        expect(tracker.count('asset-2')).toBe(0);
+
+        state.image = asset2;
+
+        expect(tracker.count('asset-1')).toBe(0);
+        expect(tracker.count('asset-2')).toBe(1);
+    });
+    test('keeps an Asset while another reference still exists', () => {
+        const tracker = new AssetReferenceTracker();
+
+        const asset = new Asset('asset-1', 100, 'image/png');
+        const anotherAsset = new Asset('asset-2', 200, 'image/jpeg');
+
+        const state = createState(
+            {
+                image: asset,
+                thumbnail: asset,
+            },
+            undefined,
+            tracker,
+        );
+
+        expect(tracker.count('asset-1')).toBe(2);
+
+        state.image = anotherAsset;
+
+        expect(tracker.count('asset-1')).toBe(1);
+        expect(tracker.count('asset-2')).toBe(1);
+    });
+    test('removes Asset reference when a property is deleted', async () => {
+        const tracker = new AssetReferenceTracker();
+
+        const asset = new Asset('asset-1', 100, 'image/png');
+
+        const state = createState(
+            {
+                image: asset,
+            } as { image?: Asset },
+            undefined,
+            tracker,
+        );
+
+        expect(tracker.count('asset-1')).toBe(1);
+
+        delete state.image;
+
+        expect(tracker.count('asset-1')).toBe(0);
     });
     test('null and undefined are preserved', () => {
         const doc = new Y.Doc();

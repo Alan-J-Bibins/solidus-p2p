@@ -1,11 +1,18 @@
+import { AssetReferenceTracker } from './asset/reference-tracker.ts';
 import { createArrayWrapper } from './datatypes/array.ts';
 import { Asset } from './datatypes/asset.ts';
 import { createMapWrapper } from './datatypes/map.ts';
 import { createSetWrapper } from './datatypes/set.ts';
 import type { StateOperation } from './types.ts';
-export function createState<T extends object>(obj: T, onUpdate?: (op: StateOperation) => void) {
+export function createState<T extends object>(
+    obj: T,
+    onUpdate?: (op: StateOperation) => void,
+    assetTracker?: AssetReferenceTracker,
+) {
+    assetTracker?.addState(obj);
+
     const proxyCache = new WeakMap<object, any>();
-    return createStateProxy(obj, onUpdate, [], proxyCache);
+    return createStateProxy(obj, onUpdate, [], proxyCache, assetTracker);
 }
 export { Asset } from './datatypes/asset.ts';
 export { applyOperation } from './apply-operation.ts';
@@ -14,6 +21,7 @@ export function createStateProxy<T extends object>(
     onUpdate?: (op: StateOperation) => void,
     path: string[] = [],
     proxyCache: WeakMap<object, any> = new WeakMap(),
+    assetTracker?: AssetReferenceTracker,
 ) {
     const handleUpdation = (op: StateOperation) => {
         if (onUpdate) onUpdate(op);
@@ -38,9 +46,9 @@ export function createStateProxy<T extends object>(
                 if (Array.isArray(value)) {
                     childProxy = createArrayWrapper(value, handleUpdation, childPath);
                 } else if (value instanceof Map) {
-                    childProxy = createMapWrapper(value, handleUpdation, childPath);
+                    childProxy = createMapWrapper(value, handleUpdation, childPath, assetTracker);
                 } else if (value instanceof Set) {
-                    childProxy = createSetWrapper(value, handleUpdation, childPath);
+                    childProxy = createSetWrapper(value, handleUpdation, childPath, assetTracker);
                 } else {
                     childProxy = createStateProxy(value, onUpdate, childPath, proxyCache);
                 }
@@ -56,7 +64,15 @@ export function createStateProxy<T extends object>(
                 return Reflect.set(target, property, value);
             }
 
+            const oldValue = Reflect.get(target, property);
+
             const result = Reflect.set(target, property, value);
+
+            if (assetTracker) {
+                void assetTracker.removeState(oldValue);
+                assetTracker.addState(value);
+            }
+
             const fullPath = [...path, String(property)];
 
             handleUpdation({
@@ -79,12 +95,18 @@ export function createStateProxy<T extends object>(
 
             const value = Reflect.get(target, property);
             const result = Reflect.deleteProperty(target, property);
+
+            if (assetTracker) {
+                void assetTracker.removeState(value);
+            }
+
             handleUpdation({
                 type: 'DELETE_PROPERTY',
                 path: [...path, String(property)],
                 value,
                 timestamp: Date.now(),
             });
+
             return result;
         },
 
