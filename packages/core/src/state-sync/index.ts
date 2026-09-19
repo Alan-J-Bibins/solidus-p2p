@@ -1,12 +1,13 @@
 import { createArrayWrapper } from './datatypes/array.ts';
+import { Asset } from './datatypes/asset.ts';
 import { createMapWrapper } from './datatypes/map.ts';
 import { createSetWrapper } from './datatypes/set.ts';
 import type { StateOperation } from './types.ts';
-
 export function createState<T extends object>(obj: T, onUpdate?: (op: StateOperation) => void) {
     const proxyCache = new WeakMap<object, any>();
     return createStateProxy(obj, onUpdate, [], proxyCache);
 }
+export { Asset } from './datatypes/asset.ts';
 export { applyOperation } from './apply-operation.ts';
 export function createStateProxy<T extends object>(
     initial: T,
@@ -23,7 +24,7 @@ export function createStateProxy<T extends object>(
             const value = Reflect.get(target, property);
 
             if (value !== null && typeof value === 'object') {
-                if (value instanceof Date || value instanceof RegExp) {
+                if (value instanceof Date || value instanceof RegExp || value instanceof Asset) {
                     return value;
                 }
 

@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vite-plus/test';
 import * as Y from 'yjs';
 
 import { solidus } from '../src/index.ts';
+import { Asset } from '../src/state-sync/index.ts';
 import { yjs } from '../src/state-sync/integrations/yjs.ts';
 
 describe('State Sync Functionality Test with YJs Integration', () => {
@@ -326,7 +327,102 @@ describe('State Sync Functionality Test with YJs Integration', () => {
         const rootMap = doc.getMap('root');
         expect(rootMap.get('date')).toBe('2024-01-01T00:00:00.000Z');
     });
+    test('Asset references are stored without binary data', () => {
+        const doc = new Y.Doc();
+        const instance = solidus({ plugins: [yjs({ doc })] });
 
+        const asset = new Asset('asset-123', 1024, 'image/png', 'photo.png');
+
+        instance.createState<{ asset: Asset }>({ asset });
+
+        const rootMap = doc.getMap('root');
+        const storedAsset = rootMap.get('asset');
+
+        expect(storedAsset).toEqual({
+            __solidusType: 'Asset',
+            id: 'asset-123',
+            size: 1024,
+            type: 'image/png',
+            name: 'photo.png',
+        });
+    });
+    test('Asset references deserialize from a remote Yjs update', () => {
+        const sourceDoc = new Y.Doc();
+        const targetDoc = new Y.Doc();
+
+        const sourceInstance = solidus({
+            plugins: [yjs({ doc: sourceDoc })],
+        });
+
+        const targetInstance = solidus({
+            plugins: [yjs({ doc: targetDoc })],
+        });
+
+        sourceInstance.createState<{ asset: Asset }>({
+            asset: new Asset('asset-123', 1024, 'image/png', 'photo.png'),
+        });
+
+        const targetState = targetInstance.createState<{
+            asset?: Asset;
+        }>({});
+
+        const update = Y.encodeStateAsUpdate(sourceDoc);
+        Y.applyUpdate(targetDoc, update);
+
+        expect(targetState.asset).toBeInstanceOf(Asset);
+        expect(targetState.asset?.id).toBe('asset-123');
+        expect(targetState.asset?.size).toBe(1024);
+        expect(targetState.asset?.type).toBe('image/png');
+        expect(targetState.asset?.name).toBe('photo.png');
+    });
+    test('remote Asset updates replace an existing Asset reference', () => {
+        const sourceDoc = new Y.Doc();
+        const targetDoc = new Y.Doc();
+
+        const sourceInstance = solidus({
+            plugins: [yjs({ doc: sourceDoc })],
+        });
+
+        const targetInstance = solidus({
+            plugins: [yjs({ doc: targetDoc })],
+        });
+
+        const sourceState = sourceInstance.createState<{ asset: Asset }>({
+            asset: new Asset('asset-1', 1024, 'image/png', 'first.png'),
+        });
+
+        const targetState = targetInstance.createState<{
+            asset?: Asset;
+        }>({});
+
+        // Initial synchronization.
+        Y.applyUpdate(targetDoc, Y.encodeStateAsUpdate(sourceDoc));
+
+        expect(targetState.asset).toBeInstanceOf(Asset);
+        expect(targetState.asset?.id).toBe('asset-1');
+
+        // Change the Asset on the source side.
+        sourceState.asset = new Asset('asset-2', 2048, 'image/jpeg', 'second.jpg');
+
+        // Synchronize only the new changes.
+        const update = Y.encodeStateAsUpdate(sourceDoc, Y.encodeStateVector(targetDoc));
+        const sourceAsset = sourceDoc.getMap('root').get('asset');
+
+        expect(sourceAsset).toEqual({
+            __solidusType: 'Asset',
+            id: 'asset-2',
+            size: 2048,
+            type: 'image/jpeg',
+            name: 'second.jpg',
+        });
+        Y.applyUpdate(targetDoc, update);
+
+        expect(targetState.asset).toBeInstanceOf(Asset);
+        expect(targetState.asset?.id).toBe('asset-2');
+        expect(targetState.asset?.size).toBe(2048);
+        expect(targetState.asset?.type).toBe('image/jpeg');
+        expect(targetState.asset?.name).toBe('second.jpg');
+    });
     test('null and undefined are preserved', () => {
         const doc = new Y.Doc();
         const instance = solidus({ plugins: [yjs({ doc })] });
