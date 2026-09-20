@@ -11,6 +11,7 @@ import type {
 } from './types.ts';
 export { createNetworkingPlugin, webrtc } from './networking/index.ts';
 export { fastCDCPlugin } from './features/fastcdc/index.ts';
+export type { AssetChunker, FastCDCResources } from './features/fastcdc/index.ts';
 export type {
     NetworkTransport,
     NetworkTransportFactory,
@@ -20,6 +21,7 @@ export type {
     WebRTCTransportConfig,
 } from './networking/index.ts';
 export { Asset } from './state-sync/datatypes/asset.ts';
+export { AssetStore } from './state-sync/asset/store.ts';
 export function solidus<TPlugins extends SolidusPlugin<any>[]>(
     config: SolidusConfig<TPlugins> = {},
 ): SolidusInstance<MergedResources<TPlugins>> {
@@ -37,8 +39,6 @@ export function solidus<TPlugins extends SolidusPlugin<any>[]>(
     };
 
     const defaultConfig: SolidusConfig = {};
-    const mergedConfig = { ...defaultConfig, ...config };
-    const plugins = mergedConfig.plugins ?? [];
     const browserNavigator = (
         globalThis as typeof globalThis & {
             navigator?: Navigator;
@@ -46,14 +46,20 @@ export function solidus<TPlugins extends SolidusPlugin<any>[]>(
     ).navigator;
 
     const assetStore =
-        mergedConfig.assetStore ??
+        config.assetStore ??
         (browserNavigator?.storage && 'getDirectory' in browserNavigator.storage
             ? new AssetStore()
             : undefined);
 
+    const mergedConfig = {
+        ...defaultConfig,
+        ...config,
+        assetStore,
+    } as SolidusConfig<TPlugins>;
+    const plugins = (mergedConfig.plugins ?? []) as SolidusPlugin<any>[];
     const assetTracker = new AssetReferenceTracker(assetStore);
     // Service plugins — run at initialization
-    plugins.forEach((plugin) => plugin.setup?.(events, rawStateRegistry, assetStore));
+    plugins.forEach((plugin) => plugin.setup?.(events, rawStateRegistry, assetStore, assetTracker));
 
     // Listen for remote operations applied by networking plugin
     events.on('state:remote-applied', (data: { peerId: string; op: StateOperation }) => {

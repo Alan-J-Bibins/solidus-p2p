@@ -1,3 +1,4 @@
+import type { AssetReferenceTracker } from './state-sync/asset/reference-tracker.ts';
 import type { AssetStore } from './state-sync/asset/store.ts';
 //NOTE: Put necessary documentation / instructions in /**/ as I've done here so that these instructions / details are picked up by LSPs which later show it to end developers.
 import type { StateOperation } from './state-sync/types.ts';
@@ -19,6 +20,7 @@ export type SolidusPlugin<TResources extends Record<string, any> = Record<string
         events: SolidusEvents,
         rawStateRegistry: Map<string, any>,
         assetStore?: AssetStore,
+        assetTracker?: AssetReferenceTracker,
     ) => void;
 
     provides?: (keyof TResources & string)[];
