@@ -514,4 +514,12 @@ describe('State Sync Functionality Test with YJs Integration', () => {
         expect(rootMap.get('a')).toBe(null);
         expect(rootMap.get('b')).toBe(undefined);
     });
+    test('tracks Assets created through the public Solidus API', () => {
+        const instance = solidus();
+
+        const asset = new Asset('public-api-asset', 1024, 'image/png');
+        const state = instance.createState({ asset });
+
+        expect(state.asset).toBe(asset);
+    });
 });

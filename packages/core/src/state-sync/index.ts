@@ -44,13 +44,19 @@ export function createStateProxy<T extends object>(
                 let childProxy;
 
                 if (Array.isArray(value)) {
-                    childProxy = createArrayWrapper(value, handleUpdation, childPath);
+                    childProxy = createArrayWrapper(value, handleUpdation, childPath, assetTracker);
                 } else if (value instanceof Map) {
                     childProxy = createMapWrapper(value, handleUpdation, childPath, assetTracker);
                 } else if (value instanceof Set) {
                     childProxy = createSetWrapper(value, handleUpdation, childPath, assetTracker);
                 } else {
-                    childProxy = createStateProxy(value, onUpdate, childPath, proxyCache);
+                    childProxy = createStateProxy(
+                        value,
+                        onUpdate,
+                        childPath,
+                        proxyCache,
+                        assetTracker,
+                    );
                 }
 
                 proxyCache.set(value, childProxy);

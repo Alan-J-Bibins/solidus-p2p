@@ -1,3 +1,5 @@
+import { AssetReferenceTracker } from './state-sync/asset/reference-tracker.ts';
+import { AssetStore } from './state-sync/asset/store.ts';
 import { createState as _createState } from './state-sync/index.ts';
 import type { StateOperation } from './state-sync/types.ts';
 import type {
@@ -7,7 +9,6 @@ import type {
     SolidusInstance,
     SolidusPlugin,
 } from './types.ts';
-
 export { createNetworkingPlugin, webrtc } from './networking/index.ts';
 export type {
     NetworkTransport,
@@ -17,7 +18,7 @@ export type {
     PeerId,
     WebRTCTransportConfig,
 } from './networking/index.ts';
-
+export { Asset } from './state-sync/datatypes/asset.ts';
 export function solidus<TPlugins extends SolidusPlugin<any>[]>(
     config: SolidusConfig<TPlugins> = {},
 ): SolidusInstance<MergedResources<TPlugins>> {
@@ -37,7 +38,19 @@ export function solidus<TPlugins extends SolidusPlugin<any>[]>(
     const defaultConfig: SolidusConfig = {};
     const mergedConfig = { ...defaultConfig, ...config };
     const plugins = mergedConfig.plugins ?? [];
+    const browserNavigator = (
+        globalThis as typeof globalThis & {
+            navigator?: Navigator;
+        }
+    ).navigator;
 
+    const assetStore =
+        mergedConfig.assetStore ??
+        (browserNavigator?.storage && 'getDirectory' in browserNavigator.storage
+            ? new AssetStore()
+            : undefined);
+
+    const assetTracker = new AssetReferenceTracker(assetStore);
     // Service plugins — run at initialization
     plugins.forEach((plugin) => plugin.setup?.(events, rawStateRegistry));
 
@@ -63,7 +76,7 @@ export function solidus<TPlugins extends SolidusPlugin<any>[]>(
             };
 
             events.emit('state:init', obj);
-            const proxy = _createState(obj, composed) as T;
+            const proxy = _createState(obj, composed, assetTracker) as T;
 
             rawStateRegistry.set(`raw-state-${rawStateRegistry.size}`, obj);
 
