@@ -1,8 +1,7 @@
 import { describe, test, expect } from 'vite-plus/test';
 
-import { createState } from '../../src/state-sync/index.ts';
+import { createState, Asset } from '../../src/state-sync/index.ts';
 import { makeTracker } from './utils.ts';
-
 // ═════════════════════════════════════════════════════════════
 // 1. DEEP OBJECT MUTATIONS
 // ═════════════════════════════════════════════════════════════
@@ -686,7 +685,20 @@ describe('Edge cases', () => {
         expect(state.r).toBe(r);
         expect(ops).toHaveLength(0);
     });
+    test('Asset instances are NOT proxied (pass through)', () => {
+        const { ops, trackOp } = makeTracker();
 
+        const asset = new Asset('asset-123', 1024, 'image/png', 'photo.png');
+
+        const state = createState({ asset }, trackOp);
+
+        // Reading the Asset should return the original instance,
+        // not a Proxy around it.
+        expect(state.asset).toBe(asset);
+
+        // Reading it should not generate any state operation.
+        expect(ops).toHaveLength(0);
+    });
     test('sparse array assignment emits ARRAY_UPDATE with undefined', () => {
         const { ops, trackOp } = makeTracker();
         const state = createState({ a: [1, 2, 3] }, trackOp);

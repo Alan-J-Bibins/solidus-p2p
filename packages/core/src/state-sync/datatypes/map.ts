@@ -1,21 +1,28 @@
+import { AssetReferenceTracker } from '../asset/reference-tracker.ts';
 import type { StateOperation } from '../types.ts';
 
 export class MapWrapper<K, V> {
     private _store: Map<K, V>;
     private _emit: (op: StateOperation) => void;
     private _path: string[];
+    private _assetTracker?: AssetReferenceTracker;
 
     constructor(
         initial: Map<K, V> = new Map(),
         emit: (op: StateOperation) => void,
         path: string[],
+        assetTracker?: AssetReferenceTracker,
     ) {
         this._emit = emit;
         this._path = path;
+        this._assetTracker = assetTracker;
         this._store = new Map(initial);
     }
 
     set(key: K, value: V) {
+        const oldValue = this._store.get(key);
+        const hadKey = this._store.has(key);
+
         this._emit({
             type: 'MAP_SET',
             path: [...this._path, String(key)],
@@ -24,11 +31,22 @@ export class MapWrapper<K, V> {
         });
 
         Map.prototype.set.apply(this._store, [key, value]);
+
+        if (this._assetTracker) {
+            if (hadKey) {
+                void this._assetTracker.removeState(oldValue);
+            }
+
+            this._assetTracker.addState(value);
+        }
+
         return this;
     }
 
     delete(key: K) {
         if (this._store.has(key)) {
+            const oldValue = this._store.get(key);
+
             this._emit({
                 type: 'MAP_DELETE',
                 path: [...this._path, String(key)],
@@ -36,7 +54,13 @@ export class MapWrapper<K, V> {
                 timestamp: Date.now(),
             });
 
-            return Map.prototype.delete.apply(this._store, [key]);
+            const result = Map.prototype.delete.apply(this._store, [key]);
+
+            if (this._assetTracker) {
+                void this._assetTracker.removeState(oldValue);
+            }
+
+            return result;
         }
 
         return false;
@@ -49,6 +73,12 @@ export class MapWrapper<K, V> {
             value: null,
             timestamp: Date.now(),
         });
+
+        if (this._assetTracker) {
+            for (const value of this._store.values()) {
+                void this._assetTracker.removeState(value);
+            }
+        }
 
         return Map.prototype.clear.apply(this._store);
     }
@@ -93,15 +123,42 @@ export class MapWrapper<K, V> {
         switch (op.type) {
             case 'MAP_SET': {
                 const key = op.key ?? op.path[op.path.length - 1];
+                const oldValue = this._store.get(key);
+                const hadKey = this._store.has(key);
+
                 Map.prototype.set.apply(this._store, [key, op.value]);
+
+                if (this._assetTracker) {
+                    if (hadKey) {
+                        void this._assetTracker.removeState(oldValue);
+                    }
+
+                    this._assetTracker.addState(op.value);
+                }
+
                 break;
             }
+
             case 'MAP_DELETE': {
                 const key = op.key ?? op.path[op.path.length - 1];
+                const oldValue = this._store.get(key);
+
                 Map.prototype.delete.apply(this._store, [key]);
+
+                if (this._assetTracker) {
+                    void this._assetTracker.removeState(oldValue);
+                }
+
                 break;
             }
+
             case 'MAP_CLEAR': {
+                if (this._assetTracker) {
+                    for (const value of this._store.values()) {
+                        void this._assetTracker.removeState(value);
+                    }
+                }
+
                 Map.prototype.clear.apply(this._store);
                 break;
             }
@@ -113,6 +170,7 @@ export function createMapWrapper<K, V>(
     initial: Map<K, V> = new Map(),
     emit: (op: StateOperation) => void,
     path: string[] = [],
+    assetTracker?: AssetReferenceTracker,
 ) {
-    return new MapWrapper<K, V>(initial, emit, path);
+    return new MapWrapper<K, V>(initial, emit, path, assetTracker);
 }

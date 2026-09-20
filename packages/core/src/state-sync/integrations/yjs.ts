@@ -1,6 +1,7 @@
 import * as Y from 'yjs';
 
 import type { SolidusPlugin } from '../../types.ts';
+import { Asset } from '../datatypes/asset.ts';
 import type { StateOperation } from '../types.ts';
 
 export interface YjsPluginOptions {
@@ -13,7 +14,15 @@ export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
         if (typeof value !== 'object') return value;
         if (value instanceof Date) return value.toISOString();
         if (value instanceof RegExp) return value.toString();
-
+        if (value instanceof Asset) {
+            return {
+                __solidusType: 'Asset',
+                id: value.id,
+                size: value.size,
+                type: value.type,
+                name: value.name,
+            };
+        }
         if (Array.isArray(value)) {
             const yArray = new Y.Array();
             yArray.insert(
@@ -238,8 +247,9 @@ export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
 function diffAndApply(doc: Y.Doc, proxy: any): void {
     const rootMap = doc.getMap('root');
 
-    // Walk each top-level key in the proxy
-    for (const key of Object.keys(proxy)) {
+    const keys = new Set([...Object.keys(proxy), ...Array.from(rootMap.keys())]);
+
+    for (const key of keys) {
         const yVal = rootMap.get(key);
         const proxyVal = proxy[key];
 
@@ -259,7 +269,12 @@ function diffNode(yNode: any, proxyNode: any, path: string[], rootProxy: any): v
         setNestedValue(rootProxy, path, deserializeYjs(yNode));
         return;
     }
+    const deserialized = deserializeYjs(yNode);
 
+    if (deserialized instanceof Asset) {
+        setNestedValue(rootProxy, path, deserialized);
+        return;
+    }
     // Both are objects — recurse
     if (yNode instanceof Y.Map) {
         // Check for added/updated keys
@@ -309,12 +324,36 @@ function deleteNestedValue(obj: any, path: string[]): void {
 function deserializeYjs(val: any): any {
     if (val instanceof Y.Map) {
         const obj: Record<string, any> = {};
-        for (const [k, v] of val.entries()) obj[k] = deserializeYjs(v);
+
+        for (const [k, v] of val.entries()) {
+            obj[k] = deserializeYjs(v);
+        }
+
+        if (obj.__solidusType === 'Asset') {
+            return new Asset(obj.id, obj.size, obj.type, obj.name);
+        }
+
         return obj;
     }
+
     if (val instanceof Y.Array) {
         return val.toArray().map(deserializeYjs);
     }
+
+    if (val !== null && typeof val === 'object') {
+        const obj: Record<string, any> = {};
+
+        for (const [k, v] of Object.entries(val)) {
+            obj[k] = deserializeYjs(v);
+        }
+
+        if (obj.__solidusType === 'Asset') {
+            return new Asset(obj.id, obj.size, obj.type, obj.name);
+        }
+
+        return obj;
+    }
+
     return val;
 }
 

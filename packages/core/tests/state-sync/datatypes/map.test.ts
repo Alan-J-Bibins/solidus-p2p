@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vite-plus/test';
 
+import { AssetReferenceTracker } from '../../../src/state-sync/asset/reference-tracker.ts';
+import { Asset } from '../../../src/state-sync/datatypes/asset.ts';
 import { createMapWrapper } from '../../../src/state-sync/datatypes/map.ts';
 import { makeTracker } from '../utils.ts';
 
@@ -14,6 +16,7 @@ describe('Testing the MapWrapper class', () => {
             ]),
             trackOp,
         );
+
         expect(map.get('a')).toBe(1);
         expect(map.get('b')).toBe(2);
     });
@@ -21,18 +24,21 @@ describe('Testing the MapWrapper class', () => {
     test('get returns undefined for missing key', () => {
         const { trackOp } = makeTracker();
         const map = createMapWrapper(new Map([['a', 1]]), trackOp);
+
         expect(map.get('missing')).toBeUndefined();
     });
 
     test('has returns true for existing key', () => {
         const { trackOp } = makeTracker();
         const map = createMapWrapper(new Map([['a', 1]]), trackOp);
+
         expect(map.has('a')).toBe(true);
     });
 
     test('has returns false for missing key', () => {
         const { trackOp } = makeTracker();
         const map = createMapWrapper(new Map([['a', 1]]), trackOp);
+
         expect(map.has('missing')).toBe(false);
     });
 
@@ -46,6 +52,7 @@ describe('Testing the MapWrapper class', () => {
             ]),
             trackOp,
         );
+
         expect(map.size).toBe(3);
     });
 
@@ -53,6 +60,7 @@ describe('Testing the MapWrapper class', () => {
     test('set emits MAP_SET for new key', () => {
         const { ops, trackOp } = makeTracker();
         const map = createMapWrapper(new Map(), trackOp);
+
         map.set('key', 'value');
 
         expect(ops).toStrictEqual([
@@ -68,6 +76,7 @@ describe('Testing the MapWrapper class', () => {
     test('set emits MAP_SET for existing key (update)', () => {
         const { ops, trackOp } = makeTracker();
         const map = createMapWrapper(new Map([['key', 'old']]), trackOp);
+
         map.set('key', 'new');
 
         expect(ops).toStrictEqual([
@@ -83,13 +92,16 @@ describe('Testing the MapWrapper class', () => {
     test('set returns the map for chaining', () => {
         const { trackOp } = makeTracker();
         const map = createMapWrapper(new Map(), trackOp);
+
         const result = map.set('a', 1);
+
         expect(result).toBe(map);
     });
 
     test('multiple sets emit individual ops', () => {
         const { ops, trackOp } = makeTracker();
         const map = createMapWrapper(new Map(), trackOp);
+
         map.set('a', 1);
         map.set('b', 2);
         map.set('c', 3);
@@ -104,6 +116,7 @@ describe('Testing the MapWrapper class', () => {
     test('delete emits MAP_DELETE for existing key', () => {
         const { ops, trackOp } = makeTracker();
         const map = createMapWrapper(new Map([['key', 'value']]), trackOp);
+
         const result = map.delete('key');
 
         expect(result).toBe(true);
@@ -120,6 +133,7 @@ describe('Testing the MapWrapper class', () => {
     test('delete returns false for missing key and emits no op', () => {
         const { ops, trackOp } = makeTracker();
         const map = createMapWrapper(new Map(), trackOp);
+
         const result = map.delete('missing');
 
         expect(result).toBe(false);
@@ -129,6 +143,7 @@ describe('Testing the MapWrapper class', () => {
     // ─── clear ───────────────────────────────────────────────────────────────
     test('clear emits MAP_CLEAR and empties map', () => {
         const { ops, trackOp } = makeTracker();
+
         const map = createMapWrapper(
             new Map([
                 ['a', 1],
@@ -136,6 +151,7 @@ describe('Testing the MapWrapper class', () => {
             ]),
             trackOp,
         );
+
         map.clear();
 
         expect(ops).toStrictEqual([
@@ -146,12 +162,14 @@ describe('Testing the MapWrapper class', () => {
                 timestamp: expect.any(Number),
             },
         ]);
+
         expect(map.size).toBe(0);
     });
 
     test('clear on empty map emits op', () => {
         const { ops, trackOp } = makeTracker();
         const map = createMapWrapper(new Map(), trackOp);
+
         map.clear();
 
         expect(ops).toHaveLength(1);
@@ -161,6 +179,7 @@ describe('Testing the MapWrapper class', () => {
     // ─── keys, values, entries ───────────────────────────────────────────────
     test('keys returns iterator of keys', () => {
         const { trackOp } = makeTracker();
+
         const map = createMapWrapper(
             new Map([
                 ['a', 1],
@@ -168,12 +187,15 @@ describe('Testing the MapWrapper class', () => {
             ]),
             trackOp,
         );
+
         const keys = [...map.keys()];
+
         expect(keys).toEqual(['a', 'b']);
     });
 
     test('values returns iterator of values', () => {
         const { trackOp } = makeTracker();
+
         const map = createMapWrapper(
             new Map([
                 ['a', 1],
@@ -181,12 +203,15 @@ describe('Testing the MapWrapper class', () => {
             ]),
             trackOp,
         );
+
         const values = [...map.values()];
+
         expect(values).toEqual([1, 2]);
     });
 
     test('entries returns iterator of [key, value] pairs', () => {
         const { trackOp } = makeTracker();
+
         const map = createMapWrapper(
             new Map([
                 ['a', 1],
@@ -194,7 +219,9 @@ describe('Testing the MapWrapper class', () => {
             ]),
             trackOp,
         );
+
         const entries = [...map.entries()];
+
         expect(entries).toEqual([
             ['a', 1],
             ['b', 2],
@@ -204,6 +231,7 @@ describe('Testing the MapWrapper class', () => {
     // ─── forEach ─────────────────────────────────────────────────────────────
     test('forEach iterates over all entries', () => {
         const { trackOp } = makeTracker();
+
         const map = createMapWrapper(
             new Map([
                 ['a', 1],
@@ -211,10 +239,13 @@ describe('Testing the MapWrapper class', () => {
             ]),
             trackOp,
         );
+
         const collected: [string, number][] = [];
+
         map.forEach((value, key) => {
             collected.push([key, value]);
         });
+
         expect(collected).toEqual([
             ['a', 1],
             ['b', 2],
@@ -224,6 +255,7 @@ describe('Testing the MapWrapper class', () => {
     // ─── Symbol.iterator ─────────────────────────────────────────────────────
     test('map is iterable via for...of', () => {
         const { trackOp } = makeTracker();
+
         const map = createMapWrapper(
             new Map([
                 ['a', 1],
@@ -231,10 +263,13 @@ describe('Testing the MapWrapper class', () => {
             ]),
             trackOp,
         );
+
         const collected: [string, number][] = [];
+
         for (const entry of map) {
             collected.push(entry);
         }
+
         expect(collected).toEqual([
             ['a', 1],
             ['b', 2],
@@ -243,6 +278,7 @@ describe('Testing the MapWrapper class', () => {
 
     test('spread operator works on map', () => {
         const { trackOp } = makeTracker();
+
         const map = createMapWrapper(
             new Map([
                 ['a', 1],
@@ -250,7 +286,9 @@ describe('Testing the MapWrapper class', () => {
             ]),
             trackOp,
         );
+
         const entries = [...map];
+
         expect(entries).toEqual([
             ['a', 1],
             ['b', 2],
@@ -275,6 +313,7 @@ describe('Testing the MapWrapper class', () => {
     test('number keys', () => {
         const { ops, trackOp } = makeTracker();
         const map = createMapWrapper(new Map<number, string>(), trackOp);
+
         map.set(42, 'answer');
 
         expect(ops[0].path).toEqual(['42']);
@@ -284,11 +323,93 @@ describe('Testing the MapWrapper class', () => {
     test('object keys (stringified path)', () => {
         const { ops, trackOp } = makeTracker();
         const map = createMapWrapper(new Map<object, string>(), trackOp);
+
         const obj = { foo: 'bar' };
+
         map.set(obj, 'value');
 
-        // Object keys get stringified in path
         expect(ops[0].path).toEqual([String(obj)]);
         expect(map.get(obj)).toBe('value');
+    });
+
+    // ─── Asset tracking ──────────────────────────────────────────────────────
+    test('tracks Asset added to a map', () => {
+        const tracker = new AssetReferenceTracker();
+        const asset = new Asset('map-asset-1', 100, 'image/png');
+
+        const map = createMapWrapper<string, Asset>(new Map(), () => {}, [], tracker);
+
+        map.set('image', asset);
+
+        expect(tracker.count('map-asset-1')).toBe(1);
+    });
+
+    test('replaces Asset reference when a map value is updated', () => {
+        const tracker = new AssetReferenceTracker();
+
+        const asset1 = new Asset('map-asset-old', 100, 'image/png');
+
+        const asset2 = new Asset('map-asset-new', 200, 'image/jpeg');
+
+        const map = createMapWrapper<string, Asset>(
+            new Map([['image', asset1]]),
+            () => {},
+            [],
+            tracker,
+        );
+
+        tracker.addState(map);
+
+        map.set('image', asset2);
+
+        expect(tracker.count('map-asset-old')).toBe(0);
+        expect(tracker.count('map-asset-new')).toBe(1);
+    });
+
+    test('removes Asset reference when a map entry is deleted', () => {
+        const tracker = new AssetReferenceTracker();
+
+        const asset = new Asset('map-asset-delete', 100, 'image/png');
+
+        const map = createMapWrapper<string, Asset>(
+            new Map([['image', asset]]),
+            () => {},
+            [],
+            tracker,
+        );
+
+        tracker.addState(map);
+
+        map.delete('image');
+
+        expect(tracker.count('map-asset-delete')).toBe(0);
+    });
+
+    test('removes Asset references when a map is cleared', () => {
+        const tracker = new AssetReferenceTracker();
+
+        const asset1 = new Asset('map-clear-1', 100, 'image/png');
+
+        const asset2 = new Asset('map-clear-2', 200, 'image/jpeg');
+
+        const map = createMapWrapper<string, Asset>(
+            new Map([
+                ['image', asset1],
+                ['thumbnail', asset2],
+            ]),
+            () => {},
+            [],
+            tracker,
+        );
+
+        tracker.addState(map);
+
+        expect(tracker.count('map-clear-1')).toBe(1);
+        expect(tracker.count('map-clear-2')).toBe(1);
+
+        map.clear();
+
+        expect(tracker.count('map-clear-1')).toBe(0);
+        expect(tracker.count('map-clear-2')).toBe(0);
     });
 });
