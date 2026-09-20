@@ -1,6 +1,6 @@
+import type { AssetStore } from './state-sync/asset/store.ts';
 //NOTE: Put necessary documentation / instructions in /**/ as I've done here so that these instructions / details are picked up by LSPs which later show it to end developers.
 import type { StateOperation } from './state-sync/types.ts';
-
 export type SolidusEvents = {
     /**
      * For setting up event listeners
@@ -29,6 +29,11 @@ export type SolidusPlugin<TResources extends Record<string, any> = Record<string
  * Configuration for Solidus' Operational Engine
  */
 export type SolidusConfig<TPlugins extends SolidusPlugin<any>[] = SolidusPlugin<any>[]> = {
+    /**
+     * Storage used for binary Assets.
+     * When omitted, Solidus uses OPFS when it is available.
+     */
+    assetStore?: AssetStore;
     /**
      * Global hook called on every local state mutation across all createState()
      * instances produced by this solidus() call.
