@@ -1,8 +1,13 @@
 import type { RTCSignal } from '../types.ts';
+import { PrioritySendQueue } from './send-queue.ts';
 
 export interface WebRtcPeerOptions {
     iceServers?: RTCIceServer[];
     onSignal: (signal: RTCSignal) => void;
+    /** Max consecutive state messages sent while chunks are waiting. Default 4. */
+    stateBurstLimit?: number;
+    /** Stop feeding the channel above this many buffered bytes. Default 64 KiB. */
+    highWaterMark?: number;
 }
 
 export class WebRtcPeer {
@@ -13,8 +18,16 @@ export class WebRtcPeer {
     private openResolvers: Array<() => void> = [];
     private isOpen = false;
 
+    private readonly queue: PrioritySendQueue<string>;
+    private readonly highWaterMark: number;
+    private readonly lowWaterMark: number;
+
     constructor(options: WebRtcPeerOptions) {
         this.onSignal = options.onSignal;
+        this.highWaterMark = options.highWaterMark ?? 64 * 1024;
+        this.lowWaterMark = Math.floor(this.highWaterMark / 4);
+        this.queue = new PrioritySendQueue<string>(options.stateBurstLimit ?? 4);
+
         this.connection = new RTCPeerConnection({ iceServers: options.iceServers ?? [] });
 
         this.connection.onicecandidate = (event) => {
@@ -30,28 +43,51 @@ export class WebRtcPeer {
 
     private attachDataChannel(channel: RTCDataChannel): void {
         this.dataChannel = channel;
+
+        // Backpressure: resume draining the queue when the browser's buffer empties
+        channel.bufferedAmountLowThreshold = this.lowWaterMark;
+        channel.onbufferedamountlow = () => this.pump();
+
         channel.onopen = () => {
             this.isOpen = true;
             this.openResolvers.forEach((resolve) => resolve());
             this.openResolvers = [];
+            this.pump();
         };
+
         channel.onmessage = async (event) => {
             let data = event.data;
-            console.log(
-                '[WebRtcPeer] Received message, type:',
-                typeof data,
-                'constructor:',
-                data?.constructor?.name,
-            );
             if (data instanceof Blob) {
                 data = await data.text();
-                console.log('[WebRtcPeer] Converted Blob to string:', data);
             } else if (data instanceof ArrayBuffer) {
                 data = new TextDecoder().decode(data);
-                console.log('[WebRtcPeer] Converted ArrayBuffer to string:', data);
             }
             this.messageHandlers.forEach((handler) => handler(data));
         };
+    }
+
+    /** Move messages from the priority queue into the channel while there's room. */
+    private pump(): void {
+        const channel = this.dataChannel;
+        if (!channel || channel.readyState !== 'open') return;
+
+        while (channel.bufferedAmount < this.highWaterMark) {
+            const next = this.queue.shift();
+            if (next === undefined) return;
+            try {
+                channel.send(next);
+            } catch (err) {
+                // e.g. message larger than the channel's max message size
+                console.error(
+                    '[solidus-p2p webrtc] Failed to send queued message, dropping it',
+                    err,
+                );
+            }
+        }
+    }
+
+    get isChannelOpen(): boolean {
+        return this.dataChannel?.readyState === 'open';
     }
 
     async createOffer(): Promise<void> {
@@ -85,11 +121,32 @@ export class WebRtcPeer {
         this.messageHandlers.push(handler);
     }
 
+    /** Direct send, bypasses the priority queue. */
     send(data: string): void {
         if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
             throw new Error('[solidus-p2p webrtc] Data channel is not open');
         }
         this.dataChannel.send(data);
+    }
+
+    /** High-priority lane. */
+    enqueueState(frame: string): void {
+        this.assertOpen();
+        this.queue.pushState(frame);
+        this.pump();
+    }
+
+    /** Low-priority lane (still guaranteed a share of bandwidth). */
+    enqueueChunk(frame: string): void {
+        this.assertOpen();
+        this.queue.pushChunk(frame);
+        this.pump();
+    }
+
+    private assertOpen(): void {
+        if (!this.isChannelOpen) {
+            throw new Error('[solidus-p2p webrtc] Data channel is not open');
+        }
     }
 
     waitUntilOpen(): Promise<void> {
@@ -98,6 +155,7 @@ export class WebRtcPeer {
     }
 
     close(): void {
+        this.queue.clear();
         this.dataChannel?.close();
         this.connection.close();
     }
