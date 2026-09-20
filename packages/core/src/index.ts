@@ -10,6 +10,7 @@ import type {
     SolidusPlugin,
 } from './types.ts';
 export { createNetworkingPlugin, webrtc } from './networking/index.ts';
+export { fastCDCPlugin } from './features/fastcdc/index.ts';
 export type {
     NetworkTransport,
     NetworkTransportFactory,
@@ -52,7 +53,7 @@ export function solidus<TPlugins extends SolidusPlugin<any>[]>(
 
     const assetTracker = new AssetReferenceTracker(assetStore);
     // Service plugins — run at initialization
-    plugins.forEach((plugin) => plugin.setup?.(events, rawStateRegistry));
+    plugins.forEach((plugin) => plugin.setup?.(events, rawStateRegistry, assetStore));
 
     // Listen for remote operations applied by networking plugin
     events.on('state:remote-applied', (data: { peerId: string; op: StateOperation }) => {

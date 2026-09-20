@@ -15,7 +15,11 @@ export type SolidusEvents = {
 
 export type SolidusPlugin<TResources extends Record<string, any> = Record<string, any>> = {
     name: string;
-    setup?: (events: SolidusEvents, rawStateRegistry: Map<string, any>) => void;
+    setup?: (
+        events: SolidusEvents,
+        rawStateRegistry: Map<string, any>,
+        assetStore?: AssetStore,
+    ) => void;
 
     provides?: (keyof TResources & string)[];
     create?: <K extends keyof TResources & string>(

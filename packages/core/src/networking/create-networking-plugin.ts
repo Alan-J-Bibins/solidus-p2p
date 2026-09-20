@@ -4,6 +4,7 @@ import type { SolidusPlugin } from '../types.ts';
 import type {
     BaseNetworkingConfig,
     NetworkHandle,
+    Chunk,
     NetworkTransport,
     NetworkTransportFactory,
 } from './types.ts';
@@ -28,6 +29,13 @@ export function createNetworkingPlugin<
 
         setup(events, registry) {
             rawStateRegistry = registry;
+
+            events.on('network:chunk', (chunk: Chunk) => {
+                activeTransports.forEach((transport) => {
+                    transport.broadcastChunk(chunk);
+                });
+            });
+
             events.on('state:operation', (op: StateOperation) => {
                 const payload = JSON.stringify({ kind: 'state-update', op });
                 activeTransports.forEach((transport) => {
