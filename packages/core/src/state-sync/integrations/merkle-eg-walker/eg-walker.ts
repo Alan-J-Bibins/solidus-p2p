@@ -11,18 +11,50 @@ import { OperationHandlerRegistry } from './handlers.ts';
 class InternalState<TState> {
     private prepareVersion: Set<string>;
     private effectVersion: Set<string>;
-    private state: TState;
+    private effectState: TState;
+    private prepareState: TState;
     private appliedOps: Map<string, StateOperation>;
+    private handlerRegistry: OperationHandlerRegistry;
 
-    constructor(initialState: TState) {
+    constructor(initialState: TState, handlerRegistry: OperationHandlerRegistry) {
         this.prepareVersion = new Set();
         this.effectVersion = new Set();
-        this.state = initialState;
+        this.effectState = initialState;
+        this.prepareState = this.cloneState(initialState);
         this.appliedOps = new Map();
+        this.handlerRegistry = handlerRegistry;
+    }
+
+    /**
+     * Deep clone a state structure
+     */
+    private cloneState(state: any): any {
+        if (state === null || state === undefined) {
+            return state;
+        }
+        if (state instanceof Map) {
+            return new Map(Array.from(state.entries()).map(([k, v]) => [k, this.cloneState(v)]));
+        }
+        if (state instanceof Set) {
+            return new Set(Array.from(state).map((v) => this.cloneState(v)));
+        }
+        if (Array.isArray(state)) {
+            return state.map((v) => this.cloneState(v));
+        }
+        if (typeof state === 'object') {
+            const cloned: any = {};
+            for (const key in state) {
+                if (Object.prototype.hasOwnProperty.call(state, key)) {
+                    cloned[key] = this.cloneState(state[key]);
+                }
+            }
+            return cloned;
+        }
+        return state;
     }
 
     getState(): TState {
-        return this.state;
+        return this.effectState;
     }
 
     /**
@@ -33,6 +65,12 @@ class InternalState<TState> {
         this.prepareVersion.add(cid);
         this.effectVersion.add(cid);
         this.appliedOps.set(cid, operation);
+
+        // Apply to both states
+        const handler = this.handlerRegistry.getHandler(operation.type);
+        handler.apply(this.prepareState, operation);
+        handler.apply(this.effectState, operation);
+
         return operation;
     }
 
@@ -43,6 +81,9 @@ class InternalState<TState> {
     retreat(cid: string): void {
         if (this.prepareVersion.has(cid)) {
             this.prepareVersion.delete(cid);
+
+            // Rebuild prepare state from scratch based on current prepare version
+            this.rebuildPrepareState();
         }
     }
 
@@ -53,6 +94,55 @@ class InternalState<TState> {
     advance(cid: string): void {
         if (this.effectVersion.has(cid) && !this.prepareVersion.has(cid)) {
             this.prepareVersion.add(cid);
+
+            // Rebuild prepare state from scratch based on current prepare version
+            this.rebuildPrepareState();
+        }
+    }
+
+    /**
+     * Rebuild the prepare state based on which operations are in the prepare version
+     */
+    private rebuildPrepareState(): void {
+        // Start with a fresh clone of the initial state
+        this.prepareState = this.cloneState(this.effectState);
+
+        // Clear it and reapply only the operations in prepare version
+        // We need to get all operations in topological order
+        const opsInPrepare = Array.from(this.prepareVersion)
+            .map((cid) => ({ cid, op: this.appliedOps.get(cid)! }))
+            .filter((x) => x.op)
+            .sort((a, b) => {
+                // Sort by Lamport timestamp if available, otherwise by cid
+                const aLamport = (a.op as any).lamport || 0;
+                const bLamport = (b.op as any).lamport || 0;
+                return aLamport - bLamport;
+            });
+
+        // Clear the prepare state and reapply operations
+        this.clearState(this.prepareState);
+        for (const { op } of opsInPrepare) {
+            const handler = this.handlerRegistry.getHandler(op.type);
+            handler.apply(this.prepareState, op);
+        }
+    }
+
+    /**
+     * Clear a state object
+     */
+    private clearState(state: any): void {
+        if (state instanceof Map) {
+            state.clear();
+        } else if (state instanceof Set) {
+            state.clear();
+        } else if (Array.isArray(state)) {
+            state.length = 0;
+        } else if (typeof state === 'object') {
+            for (const key in state) {
+                if (Object.prototype.hasOwnProperty.call(state, key)) {
+                    delete state[key];
+                }
+            }
         }
     }
 
@@ -128,14 +218,22 @@ export class EgWalker<TState> {
     lamportCounter: number;
     peerId: string;
     handlerRegistry: OperationHandlerRegistry;
+    private onRemoteApplied?: (state: TState) => void;
 
-    constructor(graph: MerkleEventGraph, dagSyncer: DagSyncer, state: TState, peerId: string) {
+    constructor(
+        graph: MerkleEventGraph,
+        dagSyncer: DagSyncer,
+        state: TState,
+        peerId: string,
+        onRemoteApplied?: (state: TState) => void,
+    ) {
         this.graph = graph;
         this.dagSyncer = dagSyncer;
         this.state = state;
         this.lamportCounter = 0;
         this.peerId = peerId;
         this.handlerRegistry = new OperationHandlerRegistry();
+        this.onRemoteApplied = onRemoteApplied;
     }
 
     getState() {
@@ -272,12 +370,43 @@ export class EgWalker<TState> {
     }
 
     /**
+     * Deep clone a state structure, preserving Maps, Sets, Arrays, and plain objects
+     */
+    private cloneState(state: any): any {
+        if (state === null || state === undefined) {
+            return state;
+        }
+        if (state instanceof Map) {
+            return new Map(Array.from(state.entries()).map(([k, v]) => [k, this.cloneState(v)]));
+        }
+        if (state instanceof Set) {
+            return new Set(Array.from(state).map((v) => this.cloneState(v)));
+        }
+        if (Array.isArray(state)) {
+            return state.map((v) => this.cloneState(v));
+        }
+        if (typeof state === 'object') {
+            const cloned: any = {};
+            for (const key in state) {
+                if (Object.prototype.hasOwnProperty.call(state, key)) {
+                    cloned[key] = this.cloneState(state[key]);
+                }
+            }
+            return cloned;
+        }
+        return state;
+    }
+
+    /**
      * Rebuild state from a specific point in the DAG by replaying all operations from root
      */
     private async rebuildStateFromLCA(lcaCid: string): Promise<TState> {
         const opsToLCA = this.getAllOperationsTo(lcaCid);
         opsToLCA.sort((a, b) => a.lamport - b.lamport);
-        const freshState = {} as TState;
+
+        // Clone the current state structure to preserve Maps, Sets, etc.
+        const freshState = this.cloneState(this.state) as TState;
+
         for (const op of opsToLCA) {
             const handler = this.handlerRegistry.getHandler(op.operation.type);
             handler.apply(freshState, op.operation);
@@ -352,7 +481,7 @@ export class EgWalker<TState> {
         const allOps = [...localOps, ...remoteOps];
         const sortedOps = this.topologicalSort(allOps);
         const lcaState = await this.rebuildStateFromLCA(lca);
-        const internalState = new InternalState(lcaState);
+        const internalState = new InternalState(lcaState, this.handlerRegistry);
 
         for (const op of sortedOps) {
             internalState.adjustPrepareVersion(op.parents, allOps);
@@ -380,5 +509,10 @@ export class EgWalker<TState> {
 
         const maxLamport = Math.max(...allOps.map((op) => op.lamport), this.lamportCounter);
         this.lamportCounter = maxLamport;
+
+        // Emit event to notify that remote operations have been applied
+        if (this.onRemoteApplied) {
+            this.onRemoteApplied(this.state);
+        }
     }
 }

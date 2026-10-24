@@ -73,8 +73,16 @@ export function merkleEGWalker(options: MerkleEGWalkerOptions): SolidusPlugin {
                 },
             } as any;
 
-            // Initialize the EgWalker
-            egWalker = new EgWalker(graph, dagSyncer, options.initialState ?? {}, options.peerId);
+            // Initialize the EgWalker with a callback to emit remote-applied events
+            egWalker = new EgWalker(
+                graph,
+                dagSyncer,
+                options.initialState ?? {},
+                options.peerId,
+                (state) => {
+                    events.emit('state:remote-applied', state);
+                },
+            );
 
             // Listen for state initialization
             events.on('state:init', (initialState: any) => {
