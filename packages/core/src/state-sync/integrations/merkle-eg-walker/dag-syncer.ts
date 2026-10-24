@@ -7,7 +7,7 @@ import type { MerkleEventNode } from './types.ts';
  */
 export class DagSyncer {
     private events: SolidusEvents;
-    private peerNetwork: any; // NetworkHandle from networking plugin
+    private peerNetwork: any;
     private pendingRequests: Map<
         string,
         {
@@ -23,12 +23,10 @@ export class DagSyncer {
         this.peerNetwork = peerNetwork;
         this.pendingRequests = new Map();
 
-        // Listen for incoming messages from peers
         this.peerNetwork.onMessage((peerId: string, raw: string) => {
             this.handleMessage(peerId, raw);
         });
 
-        // Listen for peer connection events
         this.events.on('network:peer-joined', ({ peerId }: { peerId: string }) => {
             console.log('[DagSyncer] Peer joined:', peerId);
         });
@@ -56,12 +54,10 @@ export class DagSyncer {
      * Returns a promise that resolves when a peer provides the node.
      */
     async getNode(cid: string, timeoutMs = 5000): Promise<MerkleEventNode> {
-        // Check if we already have a pending request for this CID
         if (this.pendingRequests.has(cid)) {
             return this.pendingRequests.get(cid)!.promise;
         }
 
-        // Create a promise that will be resolved when we receive the node
         let resolve!: (node: MerkleEventNode) => void;
         let reject!: (error: Error) => void;
         const promise = new Promise<MerkleEventNode>((res, rej) => {
@@ -76,7 +72,6 @@ export class DagSyncer {
 
         this.pendingRequests.set(cid, { promise, resolve, reject, timeout });
 
-        // Broadcast request to all peers
         const message = JSON.stringify({
             kind: 'dag:request',
             cid,
@@ -96,17 +91,14 @@ export class DagSyncer {
 
             switch (message.kind) {
                 case 'dag:request':
-                    // Peer is requesting a node from us
                     this.handleNodeRequest(peerId, message.cid);
                     break;
 
                 case 'dag:response':
-                    // Peer is sending us a node we requested
                     this.handleNodeResponse(peerId, message.node);
                     break;
 
                 case 'dag:announce':
-                    // Peer is announcing they have a new node
                     this.handleNodeAnnounce(peerId, message.cid);
                     break;
             }
@@ -119,7 +111,6 @@ export class DagSyncer {
      * Handle a peer requesting a node from us
      */
     private handleNodeRequest(peerId: string, cid: string): void {
-        // Emit event so the MerkleEventGraph can provide the node
         this.events.emit('dag:node-requested', { cid, peerId });
     }
 
@@ -139,7 +130,6 @@ export class DagSyncer {
      * Handle a peer announcing they have a new node
      */
     private handleNodeAnnounce(peerId: string, cid: string): void {
-        // Emit event so the plugin can decide whether to fetch it
         this.events.emit('dag:node-announced', { cid, peerId });
     }
 
@@ -159,7 +149,6 @@ export class DagSyncer {
      * Clean up resources
      */
     destroy(): void {
-        // Clear all pending requests
         for (const pending of this.pendingRequests.values()) {
             clearTimeout(pending.timeout);
             pending.reject(new Error('DagSyncer destroyed'));

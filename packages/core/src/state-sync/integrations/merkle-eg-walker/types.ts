@@ -1,6 +1,8 @@
+import type { StateOperation } from '../../types.ts';
+
 export type MerkleEventNode = {
     cid: string;
-    operation: unknown;
+    operation: StateOperation;
     parents: string[];
     lamport: number;
     peerId: string;

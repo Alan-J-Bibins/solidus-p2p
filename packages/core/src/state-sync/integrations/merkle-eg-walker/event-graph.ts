@@ -1,3 +1,4 @@
+import type { StateOperation } from '../../types.ts';
 import type { MerkleEventNode } from './types.ts';
 import { hash } from './utils.ts';
 
@@ -10,7 +11,7 @@ export class MerkleEventGraph {
         this.frontier = new Set<string>();
     }
 
-    async addNode(operation: unknown, parents: string[], lamport: number, peerId: string) {
+    async addNode(operation: StateOperation, parents: string[], lamport: number, peerId: string) {
         const nodeContent = {
             operation: operation,
             parents: parents,
