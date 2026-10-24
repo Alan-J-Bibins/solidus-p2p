@@ -37,6 +37,13 @@ export class ArrayHandler implements OperationHandler {
             if (node == null) return;
         }
 
+        // Use __applyRemote if available (for proxied arrays)
+        if (node?.__applyRemote) {
+            node.__applyRemote(operation);
+            return;
+        }
+
+        // Fallback for raw arrays
         const key = path[path.length - 1];
 
         if (!Array.isArray(node)) return;
@@ -122,6 +129,13 @@ export class MapHandler implements OperationHandler {
             if (node == null) return;
         }
 
+        // Use __applyRemote if available (for proxied maps)
+        if (node?.__applyRemote) {
+            node.__applyRemote(operation);
+            return;
+        }
+
+        // Fallback for raw maps
         if (!(node instanceof Map)) return;
 
         switch (type) {
@@ -175,6 +189,13 @@ export class SetHandler implements OperationHandler {
             if (node == null) return;
         }
 
+        // Use __applyRemote if available (for proxied sets)
+        if (node?.__applyRemote) {
+            node.__applyRemote(operation);
+            return;
+        }
+
+        // Fallback for raw sets
         if (!(node instanceof Set)) return;
 
         switch (type) {
@@ -212,6 +233,13 @@ export class ObjectHandler implements OperationHandler {
             if (node == null) return;
         }
 
+        // Use __applyRemote if available (for proxied objects)
+        if (node?.__applyRemote) {
+            node.__applyRemote(operation);
+            return;
+        }
+
+        // Fallback for raw objects
         const key = path[path.length - 1];
 
         switch (type) {

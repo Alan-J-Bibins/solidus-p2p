@@ -20,6 +20,25 @@ export function createStateProxy<T extends object>(
 
     return new Proxy<T>(initial, {
         get: (target, property) => {
+            // Handle __applyRemote method for plain objects
+            if (property === '__applyRemote') {
+                return (op: StateOperation) => {
+                    const key = op.path[op.path.length - 1];
+
+                    switch (op.type) {
+                        case 'SET':
+                            Reflect.set(target, key, op.value);
+                            break;
+                        case 'DELETE_PROPERTY':
+                            Reflect.deleteProperty(target, key);
+                            break;
+                        case 'DEFINE_PROPERTY':
+                            Reflect.defineProperty(target, key, op.value);
+                            break;
+                    }
+                };
+            }
+
             const value = Reflect.get(target, property);
 
             if (value !== null && typeof value === 'object') {
