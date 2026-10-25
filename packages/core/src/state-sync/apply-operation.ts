@@ -1,3 +1,4 @@
+import { AssetReferenceTracker } from './asset/reference-tracker.ts';
 import type { StateOperation } from './types.ts';
 
 /**
@@ -5,7 +6,11 @@ import type { StateOperation } from './types.ts';
  * local createState() Proxy's traps don't re-fire and re-broadcast the same
  * operation back out (which would cause an infinite echo between peers).
  */
-export function applyOperation(target: any, op: StateOperation): void {
+export function applyOperation(
+    target: any,
+    op: StateOperation,
+    assetTracker?: AssetReferenceTracker,
+): void {
     const { path, type, value } = op;
 
     if (path.length === 0) {
@@ -23,28 +28,54 @@ export function applyOperation(target: any, op: StateOperation): void {
     const key = path[path.length - 1];
 
     switch (type) {
-        case 'SET':
+        case 'SET': {
+            const oldValue = node[key];
             node[key] = value;
+            if (assetTracker) {
+                void assetTracker.removeState(oldValue);
+                assetTracker.addState(value);
+            }
             break;
-        case 'DELETE_PROPERTY':
+        }
+        case 'DELETE_PROPERTY': {
+            const oldValue = node[key];
             delete node[key];
+            if (assetTracker) {
+                void assetTracker.removeState(oldValue);
+            }
             break;
-        case 'DEFINE_PROPERTY':
+        }
+        case 'DEFINE_PROPERTY': {
+            const oldValue = node[key];
             Object.defineProperty(node, key, value);
+            if (assetTracker) {
+                void assetTracker.removeState(oldValue);
+                assetTracker.addState(value?.value);
+            }
             break;
+        }
         case 'ARRAY_INSERT':
             if (Array.isArray(node)) {
                 node.splice(Number(key), 0, value);
+                assetTracker?.addState(value);
             }
             break;
         case 'ARRAY_DELETE':
             if (Array.isArray(node)) {
+                const oldValue = node[Number(key)];
                 node.splice(Number(key), 1);
+                if (assetTracker) void assetTracker.removeState(oldValue);
             }
             break;
         case 'ARRAY_UPDATE':
             if (Array.isArray(node)) {
-                node[Number(key)] = value;
+                const index = Number(key);
+                const oldValue = node[index];
+                node[index] = value;
+                if (assetTracker) {
+                    void assetTracker.removeState(oldValue);
+                    assetTracker.addState(value);
+                }
             }
             break;
         case 'ARRAY_RESIZE':
@@ -54,7 +85,12 @@ export function applyOperation(target: any, op: StateOperation): void {
             break;
         case 'ARRAY_REPLACE':
             if (Array.isArray(node)) {
+                const oldValues = [...node];
                 node.splice(0, node.length, ...(value as any[]));
+                if (assetTracker) {
+                    for (const oldValue of oldValues) void assetTracker.removeState(oldValue);
+                    for (const newValue of node) assetTracker.addState(newValue);
+                }
             }
             break;
         case 'MAP_SET':

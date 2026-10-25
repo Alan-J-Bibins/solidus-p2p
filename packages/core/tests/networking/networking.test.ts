@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, expect, test } from 'vite-plus/test';
 
-import { solidus } from './../../src/index.ts';
+import { Asset, AssetStore, solidus } from './../../src/index.ts';
+import { createNetworkingPlugin } from './../../src/networking/create-networking-plugin.ts';
 import { webrtc } from './../../src/networking/index.ts';
 import {
     startTestSignalingServer,
@@ -78,3 +79,72 @@ test('a late-joining third peer connects to both existing peers', async () => {
     await expect.poll(() => c.network.peers.length, { timeout: 5000, interval: 50 }).toBe(2);
     await expect.poll(() => a.network.peers.length, { timeout: 5000, interval: 50 }).toBe(2);
 }, 20000);
+
+test('Asset state mutations preserve Asset references across the network', async () => {
+    const asset = new Asset('network-asset', 3, 'application/octet-stream');
+
+    const transports: Array<{
+        messageHandlers: Array<(peerId: string, data: string) => void>;
+        broadcastState: (data: string) => void;
+    }> = [];
+
+    const createMemoryTransport = () => {
+        const transport = {
+            localPeerId: `peer-${transports.length}`,
+            messageHandlers: [] as Array<(peerId: string, data: string) => void>,
+            connect: async () => {},
+            sendTo: () => {},
+            broadcast: () => {},
+            broadcastState(data: string) {
+                for (const other of transports) {
+                    if (other !== transport) {
+                        other.messageHandlers.forEach((handler) =>
+                            handler(transport.localPeerId, data),
+                        );
+                    }
+                }
+            },
+            broadcastChunk: () => {},
+            getPeers: () => [],
+            onMessage(handler: (peerId: string, data: string) => void) {
+                transport.messageHandlers.push(handler);
+            },
+            onChunk: () => {},
+            onPeerJoin: () => {},
+            onPeerLeave: () => {},
+            close: () => {},
+        };
+        transports.push(transport);
+        return transport;
+    };
+
+    const a = solidus({
+        plugins: [createNetworkingPlugin(createMemoryTransport, 'test-network-a')],
+    });
+    const deleted: string[] = [];
+    const bStore = {
+        async delete(id: string) {
+            deleted.push(id);
+        },
+    } as unknown as AssetStore;
+    const b = solidus({
+        assetStore: bStore,
+        plugins: [createNetworkingPlugin(createMemoryTransport, 'test-network-b')],
+    });
+    const rawA = { asset: null as Asset | null };
+    const rawB = { asset: null as Asset | null };
+    const stateA = a.createState(rawA);
+    b.createState(rawB);
+    a.create({ type: 'peer-network', config: { target: rawA } });
+    b.create({ type: 'peer-network', config: { target: rawB } });
+
+    stateA.asset = asset;
+
+    expect(rawB.asset).toBeInstanceOf(Asset);
+    expect(rawB.asset?.id).toBe(asset.id);
+
+    stateA.asset = null;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(deleted).toContain(asset.id);
+    expect(rawB.asset).toBeNull();
+});
