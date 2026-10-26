@@ -28,17 +28,27 @@ export class SignalingClient {
 
         this.ws.addEventListener('message', (event) => {
             const message: WireMessage = JSON.parse(event.data);
+            console.log('[SignalingClient] Received message:', message.kind, message);
             switch (message.kind) {
                 case 'welcome':
+                    console.log(
+                        '[SignalingClient] Welcome! My peerId:',
+                        message.peerId,
+                        'Existing peers:',
+                        message.peers,
+                    );
                     this.welcomeHandlers.forEach((h) => h(message.peerId, message.peers));
                     break;
                 case 'peer-joined':
+                    console.log('[SignalingClient] Peer joined:', message.peerId);
                     this.joinHandlers.forEach((h) => h(message.peerId));
                     break;
                 case 'peer-left':
+                    console.log('[SignalingClient] Peer left:', message.peerId);
                     this.leaveHandlers.forEach((h) => h(message.peerId));
                     break;
                 case 'signal':
+                    console.log('[SignalingClient] Signal from:', message.from);
                     this.signalHandlers.forEach((h) => h(message.from, message.signal));
                     break;
             }

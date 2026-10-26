@@ -41,9 +41,23 @@ export function createWebRTCTransport(config: WebRTCTransportConfig): NetworkTra
     }
 
     function setupPeer(remotePeerId: string, isInitiator: boolean): WebRtcPeer {
+        console.log(
+            '[WebRTCTransport] Setting up peer:',
+            remotePeerId,
+            'isInitiator:',
+            isInitiator,
+        );
         const peer = new WebRtcPeer({
             iceServers,
-            onSignal: (signal) => signaling.sendSignal(remotePeerId, signal),
+            onSignal: (signal) => {
+                console.log(
+                    '[WebRTCTransport] Sending signal to:',
+                    remotePeerId,
+                    'type:',
+                    signal.type,
+                );
+                signaling.sendSignal(remotePeerId, signal);
+            },
             stateBurstLimit: config.stateBurstLimit,
             highWaterMark: config.highWaterMark,
         });
@@ -51,9 +65,15 @@ export function createWebRTCTransport(config: WebRTCTransportConfig): NetworkTra
 
         peer.onMessage((data) => handleIncoming(remotePeerId, data));
 
-        void peer.waitUntilOpen().then(() => {
-            joinHandlers.forEach((handler) => handler(remotePeerId));
-        });
+        void peer
+            .waitUntilOpen()
+            .then(() => {
+                console.log('[WebRTCTransport] Peer connection open:', remotePeerId);
+                joinHandlers.forEach((handler) => handler(remotePeerId));
+            })
+            .catch((err) => {
+                console.error('[WebRTCTransport] Peer connection failed:', remotePeerId, err);
+            });
 
         if (isInitiator) void peer.createOffer();
 
@@ -72,16 +92,19 @@ export function createWebRTCTransport(config: WebRTCTransportConfig): NetworkTra
     let readyPromise: Promise<void> | null = null;
 
     signaling.onPeerJoined((peerId) => {
+        console.log('[WebRTCTransport] Signaling says peer joined:', peerId);
         if (!peerConnections.has(peerId)) setupPeer(peerId, false);
     });
 
     signaling.onPeerLeft((peerId) => {
+        console.log('[WebRTCTransport] Signaling says peer left:', peerId);
         peerConnections.get(peerId)?.close();
         peerConnections.delete(peerId);
         leaveHandlers.forEach((handler) => handler(peerId));
     });
 
     signaling.onSignal((from, signal) => {
+        console.log('[WebRTCTransport] Signal from:', from, 'type:', signal.type);
         const peer = peerConnections.get(from) ?? setupPeer(from, false);
         void peer.handleSignal(signal);
     });

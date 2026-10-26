@@ -1,0 +1,204 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family:
+        system-ui,
+        -apple-system,
+        sans-serif;
+    background: #f5f5f5;
+    color: #333;
+}
+
+.container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+h2 {
+    margin: 0 0 24px;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+h3 {
+    margin: 0 0 12px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #555;
+}
+
+/* --- Config Panel --- */
+
+.config-panel {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+}
+
+.config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.config-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.config-grid label span {
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+}
+
+.config-grid input {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.config-grid input:focus {
+    outline: none;
+    border-color: #4a90d9;
+    box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
+}
+
+.config-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.config-actions button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#connectBtn {
+    background: #4a90d9;
+    color: #fff;
+}
+
+#connectBtn:hover:not(:disabled) {
+    background: #357abd;
+}
+
+#disconnectBtn {
+    background: #e74c3c;
+    color: #fff;
+}
+
+#disconnectBtn:hover:not(:disabled) {
+    background: #c0392b;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.status {
+    font-size: 13px;
+    color: #888;
+}
+
+.status.connected {
+    color: #27ae60;
+}
+
+.status.connecting {
+    color: #f39c12;
+}
+
+/* --- Whiteboard --- */
+
+.whiteboard-section {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #eee;
+    background: #fafafa;
+}
+
+.toolbar label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+}
+
+.toolbar input[type='color'] {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 2px;
+}
+
+.toolbar input[type='range'] {
+    width: 100px;
+}
+
+.toolbar button {
+    padding: 6px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.toolbar button:hover {
+    background: #f0f0f0;
+}
+
+.stroke-count {
+    margin-left: auto;
+    font-size: 13px;
+    color: #888;
+}
+
+#canvas {
+    display: block;
+    width: 100%;
+    cursor: crosshair;
+    background: #fff;
+}
+
+@media (max-width: 640px) {
+    .config-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .toolbar {
+        flex-wrap: wrap;
+    }
+}

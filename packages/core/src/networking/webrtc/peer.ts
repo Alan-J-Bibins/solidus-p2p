@@ -28,20 +28,34 @@ export class WebRtcPeer {
         this.lowWaterMark = Math.floor(this.highWaterMark / 4);
         this.queue = new PrioritySendQueue<string>(options.stateBurstLimit ?? 4);
 
+        console.log('[WebRtcPeer] Creating connection with iceServers:', options.iceServers);
         this.connection = new RTCPeerConnection({ iceServers: options.iceServers ?? [] });
 
         this.connection.onicecandidate = (event) => {
             if (event.candidate) {
+                console.log('[WebRtcPeer] ICE candidate generated:', event.candidate.candidate);
                 this.onSignal({ type: 'ice-candidate', candidate: event.candidate.toJSON() });
+            } else {
+                console.log('[WebRtcPeer] ICE candidate gathering complete');
             }
         };
 
+        this.connection.oniceconnectionstatechange = () => {
+            console.log('[WebRtcPeer] ICE connection state:', this.connection.iceConnectionState);
+        };
+
+        this.connection.onconnectionstatechange = () => {
+            console.log('[WebRtcPeer] Connection state:', this.connection.connectionState);
+        };
+
         this.connection.ondatachannel = (event) => {
+            console.log('[WebRtcPeer] Data channel received');
             this.attachDataChannel(event.channel);
         };
     }
 
     private attachDataChannel(channel: RTCDataChannel): void {
+        console.log('[WebRtcPeer] Attaching data channel:', channel.label);
         this.dataChannel = channel;
 
         // Backpressure: resume draining the queue when the browser's buffer empties
@@ -49,10 +63,19 @@ export class WebRtcPeer {
         channel.onbufferedamountlow = () => this.pump();
 
         channel.onopen = () => {
+            console.log('[WebRtcPeer] Data channel opened');
             this.isOpen = true;
             this.openResolvers.forEach((resolve) => resolve());
             this.openResolvers = [];
             this.pump();
+        };
+
+        channel.onclose = () => {
+            console.log('[WebRtcPeer] Data channel closed');
+        };
+
+        channel.onerror = (err) => {
+            console.error('[WebRtcPeer] Data channel error:', err);
         };
 
         channel.onmessage = async (event) => {

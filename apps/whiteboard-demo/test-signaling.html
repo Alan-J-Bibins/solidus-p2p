@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Signaling Test</title>
+    </head>
+    <body>
+        <h1>Signaling Server Test</h1>
+        <div>
+            <label>Server: <input id="server" value="ws://localhost:8080" /></label>
+            <label>Room: <input id="room" value="test-room" /></label>
+            <button id="connect">Connect</button>
+        </div>
+        <div id="status">Disconnected</div>
+        <div id="log" style="font-family: monospace; white-space: pre; margin-top: 20px"></div>
+
+        <script>
+            const log = (msg) => {
+                const div = document.getElementById('log');
+                div.textContent += new Date().toISOString() + ' - ' + msg + '\n';
+                console.log(msg);
+            };
+
+            document.getElementById('connect').addEventListener('click', () => {
+                const server = document.getElementById('server').value;
+                const room = document.getElementById('room').value;
+
+                log(`Connecting to ${server}?room=${room}`);
+
+                const ws = new WebSocket(`${server}?room=${encodeURIComponent(room)}`);
+
+                ws.onopen = () => {
+                    log('WebSocket connected');
+                    document.getElementById('status').textContent = 'Connected';
+                };
+
+                ws.onmessage = (event) => {
+                    const msg = JSON.parse(event.data);
+                    log(`Received: ${JSON.stringify(msg)}`);
+
+                    if (msg.kind === 'welcome') {
+                        log(`My peer ID: ${msg.peerId}`);
+                        log(`Existing peers: ${msg.peers.join(', ')}`);
+                    } else if (msg.kind === 'peer-joined') {
+                        log(`Peer joined: ${msg.peerId}`);
+                    } else if (msg.kind === 'peer-left') {
+                        log(`Peer left: ${msg.peerId}`);
+                    }
+                };
+
+                ws.onerror = (err) => {
+                    log(`Error: ${err}`);
+                };
+
+                ws.onclose = () => {
+                    log('WebSocket closed');
+                    document.getElementById('status').textContent = 'Disconnected';
+                };
+            });
+        </script>
+    </body>
+</html>

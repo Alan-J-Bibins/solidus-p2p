@@ -99,6 +99,21 @@ export function createNetworkingPlugin<
                     }
                 });
             });
+
+            // Listen for state sync plugin broadcasts (yjs, merkleEGWalker, etc.)
+            events.on('state:broadcast', (data: any) => {
+                const payload = JSON.stringify({
+                    kind: 'state-sync',
+                    data: serializeNetworkValue(data),
+                });
+                activeTransports.forEach((transport) => {
+                    try {
+                        transport.broadcastState(payload);
+                    } catch {
+                        console.log('No open peers yet');
+                    }
+                });
+            });
         },
 
         create(type, resourceConfig, events) {
@@ -116,6 +131,8 @@ export function createNetworkingPlugin<
                 transport.onMessage((peerId, raw) => {
                     try {
                         const parsed = JSON.parse(raw);
+
+                        // Handle direct state operations (fallback mode without state sync plugins)
                         if (parsed.kind === 'state-update') {
                             const op = parsed.op as StateOperation;
                             const revivedOp: StateOperation = {
@@ -126,6 +143,12 @@ export function createNetworkingPlugin<
                                 applyOperation(rawState, revivedOp, assetTracker);
                             }
                             events.emit('state:remote-applied', { peerId, op: revivedOp });
+                        }
+
+                        // Handle state sync plugin data (yjs, merkleEGWalker, etc.)
+                        if (parsed.kind === 'state-sync') {
+                            const data = deserializeNetworkValue(parsed.data);
+                            events.emit('state:remote-operation', peerId, data);
                         }
                     } catch (err) {
                         console.log('[Networking] Failed to parse message:', err, 'raw:', raw);

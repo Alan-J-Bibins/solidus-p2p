@@ -5,7 +5,7 @@ import { MerkleEventGraph } from './event-graph.ts';
 import type { MerkleEventNode } from './types.ts';
 
 export interface MerkleEGWalkerOptions {
-    peerId: string;
+    peerId?: string;
     initialState?: any;
 }
 
@@ -16,7 +16,7 @@ export function merkleEGWalker(options: MerkleEGWalkerOptions): SolidusPlugin {
 
     return {
         name: 'merkle-eg-walker',
-        setup(events: SolidusEvents) {
+        setup(events: SolidusEvents, rawStateRegistry: Map<string, any>) {
             graph = new MerkleEventGraph();
 
             // Track pending node requests for the dagSyncer
@@ -78,11 +78,48 @@ export function merkleEGWalker(options: MerkleEGWalkerOptions): SolidusPlugin {
                 graph,
                 dagSyncer,
                 options.initialState ?? {},
-                options.peerId,
+                options.peerId ?? 'local',
                 (state) => {
-                    events.emit('state:remote-applied', state);
+                    // Copy properties from EgWalker's state to the Solidus state
+                    // This triggers the proxy's set handler
+                    const proxies = Array.from(rawStateRegistry.values());
+                    for (const proxy of proxies) {
+                        // Copy all properties from the EgWalker's state to the proxy
+                        for (const key of Object.keys(state)) {
+                            if (proxy[key] !== state[key]) {
+                                proxy[key] = state[key];
+                            }
+                        }
+                        // Remove properties that are no longer in the state
+                        for (const key of Object.keys(proxy)) {
+                            if (!(key in state)) {
+                                delete proxy[key];
+                            }
+                        }
+                    }
+
+                    // Emit state:remote-applied for each operation that was merged
+                    // We need to get the operations from the graph
+                    const frontier = graph.getFrontier();
+                    if (frontier.length > 0) {
+                        const latestNode = graph.getNode(frontier[frontier.length - 1]);
+                        if (latestNode) {
+                            events.emit('state:remote-applied', {
+                                peerId: latestNode.peerId,
+                                op: latestNode.operation,
+                            });
+                        }
+                    }
                 },
             );
+
+            // Listen for network connection to get the actual peerId
+            events.on('network:peer-joined', ({ peerId }: { peerId: string }) => {
+                // Update the EgWalker's peerId if it was using the default
+                if (!options.peerId) {
+                    (egWalker as any).peerId = peerId;
+                }
+            });
 
             // Listen for state initialization
             events.on('state:init', (initialState: any) => {
