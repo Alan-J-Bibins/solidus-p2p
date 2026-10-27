@@ -1,5 +1,5 @@
 {
-    "generatedAt": "2026-10-27T04:53:25.350Z",
+    "generatedAt": "2026-10-27T08:56:01.212Z",
     "methodology": "Counts src/main.ts only — the file each app's own index.html actually loads (<script type=\"module\" src=\"/src/main.ts\">). Neither app's main.ts imports ./p2p, so src/p2p.ts is dead code on both sides and is excluded from the headline number (reported separately below for transparency). Blank lines and comment-only lines are excluded from the \"code\" count; a trailing inline comment on a code line does not get stripped. HTML/CSS/tsconfig/package.json are configuration, not application logic, and are excluded from both sides equally.",
     "withSolidus": {
         "files": [

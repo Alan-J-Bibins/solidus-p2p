@@ -14,6 +14,8 @@ import {
     type PeerId,
 } from '@solidus-p2p/core/networking';
 
+import solidusSource from '../review-2-source/with-solidus/src/main.ts?raw';
+import rawSource from '../review-2-source/without-solidus/src/main.ts?raw';
 import locData from './loc-data.json';
 
 // A "chunk" on the wire is a plain array of primitives: [fileId, index, totalChunks, base64Bytes].
@@ -149,24 +151,20 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 
     <section class="section-card compare-card">
       <div class="section-heading">
-        <div><div class="eyebrow muted">04 / SOLIDUS VS. RAW WEBRTC — MEASURED</div><h2>Line-count comparison</h2><p>Computed from the real, unmodified Review 2 sources copied into <code>review-2-source/</code>, by <code>npm run loc --workspace=review-3-demo</code> (<code>scripts/loc-compare.mjs</code>).</p></div>
+        <div><div class="eyebrow muted">04 / SOLIDUS VS. RAW WEBRTC — MEASURED</div><h2>Line-count comparison</h2></div>
       </div>
       <div class="loc-grid">
         <div class="loc-box solidus-box"><strong>${locData.withSolidus.code}</strong><span>lines of code · with Solidus</span><small>${locData.withSolidus.total} total · ${locData.withSolidus.blank} blank · ${locData.withSolidus.comment} comment</small></div>
         <div class="loc-box raw-box"><strong>${locData.withoutSolidus.code}</strong><span>lines of code · without Solidus</span><small>${locData.withoutSolidus.total} total · ${locData.withoutSolidus.blank} blank · ${locData.withoutSolidus.comment} comment</small></div>
         <div class="loc-box result-box"><strong>${locData.locSaved}</strong><span>lines saved</span><small>${locData.reductionPct !== null ? locData.reductionPct.toFixed(1) + '% reduction' : 'not comparable'}</small></div>
       </div>
-      <div class="compare-note"><span class="note-icon">i</span><p><strong>Methodology:</strong> Counts <code>src/main.ts</code> only — the file each app's own <code>index.html</code> actually loads. Both apps also ship a <code>src/p2p.ts</code>, but neither <code>main.ts</code> imports it, so it is dead code on both sides (with-solidus: ${locData.excludedDeadCode.withSolidus.code} dead lines; without-solidus: ${locData.excludedDeadCode.withoutSolidus.code} dead lines) and is excluded from the measured number rather than double-counting an unused duplicate implementation on both sides. Blank lines and comment-only lines are excluded from "code"; a trailing inline comment on a code line is not stripped, applied identically both sides. HTML/CSS/tsconfig/package.json are excluded from both sides as configuration, not application logic.</p></div>
-      <p class="compare-what"><strong>What Solidus abstracts here, based on reading both files:</strong> <code>without-solidus/src/main.ts</code> hand-implements a <code>SignalingClient</code> (WebSocket protocol + welcome/peer-joined/peer-left/signal handling), a <code>WebRtcPeer</code> class (RTCPeerConnection lifecycle, offer/answer, ICE candidate exchange, data-channel open/close), and a <code>NetworkManager</code> (peer map, initiator/responder logic) — lines 84–468 of that file, 385 lines, before a single Yjs update is ever sent. <code>with-solidus/src/main.ts</code> replaces all of that with one <code>solidusInstance.create({ type: 'peer-network', ... })</code> call plus <code>webrtc()</code> in its plugin list; the signaling protocol, RTCPeerConnection/RTCDataChannel lifecycle, and send-queue backpressure live in <code>packages/core</code> instead of the application.</p>
       <div class="comparison-grid">
         <article class="code-panel solidus-panel">
-          <div class="code-panel-head"><div><span class="language-dot solidus-dot"></span><strong>With Solidus</strong></div><span class="line-badge">real excerpt, lines 169–220</span></div>
-          <p class="code-caption">Verbatim from <code>review-2-source/with-solidus/src/main.ts</code> (255 lines total, measured above) — the full peer-network setup inside the Connect handler.</p>
+          <div class="code-panel-head"><div><span class="language-dot solidus-dot"></span><strong>With Solidus</strong></div><span class="line-badge">full file · ${locData.withSolidus.total} lines</span></div>
           <pre><code id="solidusCode"></code></pre>
         </article>
         <article class="code-panel raw-panel">
-          <div class="code-panel-head"><div><span class="language-dot raw-dot"></span><strong>Without Solidus</strong></div><span class="line-badge">real excerpt, lines 201–270 + 575–606</span></div>
-          <p class="code-caption">Verbatim from <code>review-2-source/without-solidus/src/main.ts</code> (661 lines total, measured above) — the <code>WebRtcPeer</code> core (first block) that the equivalent call site (second block) depends on.</p>
+          <div class="code-panel-head"><div><span class="language-dot raw-dot"></span><strong>Without Solidus</strong></div><span class="line-badge">full file · ${locData.withoutSolidus.total} lines</span></div>
           <pre><code id="rawCode"></code></pre>
         </article>
       </div>
@@ -207,150 +205,8 @@ const receiveChunkList = document.querySelector<HTMLDivElement>('#receiveChunkLi
 const receiveChunkCount = document.querySelector<HTMLSpanElement>('#receiveChunkCount')!;
 const receiveVerification = document.querySelector<HTMLDivElement>('#receiveVerification')!;
 
-// Verbatim excerpts from the real, unmodified review-2-source files (built as line
-// arrays, not one big template literal, so the quoted `${...}` template literals
-// INSIDE the excerpted source are just plain text here, not interpolated by us).
-const solidusSnippet = [
-    '        // Create the raw state object first',
-    '        rawDocState = {',
-    '            content: quill.root.innerHTML,',
-    '            version: 0,',
-    '        };',
-    "        console.log('[Connect] Raw state object created:', rawDocState);",
-    '',
-    '        // Create the proxied state for local use',
-    '        docState = solidusInstance.createState(rawDocState, (op) => {',
-    '            console.log(op);',
-    '        });',
-    "        console.log('[Connect] Proxied state created, docState:', docState);",
-    '',
-    '        // Create peer network - pass the RAW object, not the proxy',
-    "        console.log('[Connect] Creating peer network...');",
-    '        network = solidusInstance.create({',
-    "            type: 'peer-network',",
-    '            config: {',
-    '                target: rawDocState,',
-    '                signalingServer: config.signalingServer,',
-    '                room: config.roomName,',
-    '                iceServers: config.iceServers as RTCIceServer[],',
-    '            },',
-    '        });',
-    "        console.log('[Connect] Network created:', network);",
-    '',
-    '        if (network) {',
-    '            // Wait for signaling connection',
-    "            console.log('[Connect] Waiting for network to open...');",
-    '            await network.waitUntilOpen();',
-    "            console.log('[Connect] Network is open! Local peer ID:', network.localPeerId);",
-    '',
-    '            // Listen for peer events',
-    '            network.onPeerJoin((peerId) => {',
-    '                console.log(',
-    "                    '[Network] Peer joined:',",
-    '                    peerId,',
-    "                    'Total peers:',",
-    '                    network!.peers.length,',
-    '                );',
-    '                connectionStatus.textContent = `Connected to "${config.roomName}" (${network!.peers.length} peers)`;',
-    '            });',
-    '',
-    '            network.onPeerLeave((peerId) => {',
-    "                console.log('[Network] Peer left:', peerId, 'Total peers:', network!.peers.length);",
-    '                connectionStatus.textContent = `Connected to "${config.roomName}" (${network!.peers.length} peers)`;',
-    '            });',
-    '',
-    '            network.onMessage((peerId, data) => {',
-    "                console.log('[Network] Received message from peer:', peerId, 'data:', data);",
-    '            });',
-    '        }',
-].join('\n');
-
-const rawSnippet = [
-    '// --- WebRtcPeer core (lines 201-270) ---',
-    '    constructor(peerId: string, iceServers: RTCIceServer[]) {',
-    '        this.peerId = peerId;',
-    '        this.pc = new RTCPeerConnection({ iceServers });',
-    '        this.openPromise = new Promise((resolve) => {',
-    '            this.openResolve = resolve;',
-    '        });',
-    '',
-    '        this.pc.onicecandidate = (event) => {',
-    '            if (event.candidate) {',
-    '                this.onSignal?.({',
-    "                    type: 'ice-candidate',",
-    '                    candidate: event.candidate.toJSON(),',
-    '                });',
-    '            }',
-    '        };',
-    '',
-    '        this.pc.onconnectionstatechange = () => {',
-    '            console.log(`[Peer ${peerId}] Connection state:`, this.pc.connectionState);',
-    '            if (',
-    "                this.pc.connectionState === 'disconnected' ||",
-    "                this.pc.connectionState === 'failed'",
-    '            ) {',
-    '                this.onClose?.();',
-    '            }',
-    '        };',
-    '    }',
-    '',
-    '    get isOpen(): boolean {',
-    '        return this._isOpen;',
-    '    }',
-    '',
-    '    async createOffer(): Promise<RTCSessionDescriptionInit> {',
-    "        this.dc = this.pc.createDataChannel('data');",
-    '        this.setupDataChannel(this.dc);',
-    '',
-    '        const offer = await this.pc.createOffer();',
-    '        await this.pc.setLocalDescription(offer);',
-    '        const localDesc = this.pc.localDescription!;',
-    '        return { type: localDesc.type as RTCSdpType, sdp: localDesc.sdp };',
-    '    }',
-    '',
-    '    async handleSignal(',
-    '        signal:',
-    '            | RTCSessionDescriptionInit',
-    "            | { type: 'ice-candidate'; candidate: RTCIceCandidateInit },",
-    '    ): Promise<RTCSessionDescriptionInit | null> {',
-    "        if ('type' in signal && signal.type === 'offer') {",
-    '            await this.pc.setRemoteDescription(signal);',
-    '            const answer = await this.pc.createAnswer();',
-    '            await this.pc.setLocalDescription(answer);',
-    '            const localDesc = this.pc.localDescription!;',
-    '            return { type: localDesc.type as RTCSdpType, sdp: localDesc.sdp };',
-    '        }',
-    '        // ... answer / ice-candidate branches omitted for space, see the full file',
-    '    }',
-    '',
-    '// --- equivalent call site (lines 575-606) ---',
-    '        network = new NetworkManager(config.iceServers as RTCIceServer[]);',
-    '',
-    '        network.onMessage((_peerId, data) => {',
-    '            try {',
-    '                const msg = JSON.parse(data);',
-    "                if (msg.kind === 'yjs-update') {",
-    '                    const update = new Uint8Array(msg.update);',
-    "                    Y.applyUpdate(yDoc!, update, 'remote');",
-    '                }',
-    '            } catch (err) {',
-    "                console.error('[Network] Failed to parse message:', err);",
-    '            }',
-    '        });',
-    '',
-    '        await network.connect(config.signalingServer, config.roomName);',
-    '',
-    '        network.onPeerJoin((peerId) => {',
-    '            connectionStatus.textContent = `Connected to "${config.roomName}" (${network!.peerIds.length} peers)`;',
-    '            const stateUpdate = Y.encodeStateAsUpdate(yDoc!);',
-    '            network!.broadcast(',
-    "                JSON.stringify({ kind: 'yjs-update', update: Array.from(stateUpdate) }),",
-    '            );',
-    '        });',
-].join('\n');
-
-document.querySelector<HTMLElement>('#solidusCode')!.textContent = solidusSnippet;
-document.querySelector<HTMLElement>('#rawCode')!.textContent = rawSnippet;
+document.querySelector<HTMLElement>('#solidusCode')!.textContent = solidusSource;
+document.querySelector<HTMLElement>('#rawCode')!.textContent = rawSource;
 
 // --- Session / networking --------------------------------------------------
 
