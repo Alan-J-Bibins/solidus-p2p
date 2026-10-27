@@ -126,26 +126,44 @@ export function merkleEGWalker(options: MerkleEGWalkerOptions): SolidusPlugin {
                 egWalker.setState(initialState);
             });
 
-            // Listen for local state operations
-            events.on('state:operation', async (op: StateOperation) => {
-                if (isApplyingRemote) return;
-                await egWalker.applyLocal(op);
+            // The whiteboard (and any other app) can emit several
+            // 'state:operation' events back-to-back with no await between
+            // them (e.g. pushing a stroke then bumping a version counter).
+            // applyLocal()/addNode() are async (they await a SHA-256 hash),
+            // so without serialization two overlapping calls would race:
+            // the second op's "parents" would be read before the first op
+            // finished being added to the graph, corrupting the DAG and
+            // causing the earlier operation's broadcast to be lost. Chain
+            // all operation handling through one queue so each op fully
+            // completes (added to the graph, broadcast) before the next
+            // one starts.
+            let opQueue: Promise<void> = Promise.resolve();
+            const enqueue = (task: () => Promise<void>) => {
+                opQueue = opQueue.then(task, task);
+                return opQueue;
+            };
 
-                // Broadcast the new node to peers
-                const frontier = graph.getFrontier();
-                if (frontier.length > 0) {
-                    const node = graph.getNode(frontier[frontier.length - 1]);
+            // Listen for local state operations
+            events.on('state:operation', (op: StateOperation) => {
+                if (isApplyingRemote) return;
+                enqueue(async () => {
+                    const cid = await egWalker.applyLocal(op);
+                    const node = graph.getNode(cid);
                     if (node) {
                         events.emit('state:broadcast', node);
                     }
-                }
+                });
             });
 
             // Listen for remote messages from peers
-            events.on('state:remote-operation', async (peerId: string, data: any) => {
+            events.on('state:remote-operation', (peerId: string, data: any) => {
                 if (!data || typeof data !== 'object') return;
 
-                // Handle dag protocol messages
+                // Dag protocol control messages are handled immediately, not
+                // through the op queue below: a merge can block mid-queue
+                // waiting on a 'dag:response' for a missing ancestor, and
+                // that response itself arrives as a 'state:remote-operation'
+                // event. Queuing it behind the blocked merge would deadlock.
                 if (data.kind === 'dag:request' && data.cid) {
                     // Peer is requesting a node from us
                     const node = graph.getNode(data.cid);
@@ -170,16 +188,20 @@ export function merkleEGWalker(options: MerkleEGWalkerOptions): SolidusPlugin {
                     return;
                 }
 
-                // Handle node broadcasts (full node data)
+                // Handle node broadcasts (full node data). These do mutate
+                // shared graph/lamport state, so they're serialized with
+                // local operations via the op queue.
                 if (data.cid) {
-                    isApplyingRemote = true;
-                    try {
-                        await graph.importNode(data);
-                        await egWalker.mergeRemote(data.cid);
-                    } catch (err) {
-                        console.error('[MerkleEGWalker] Failed to merge remote node:', err);
-                    }
-                    isApplyingRemote = false;
+                    enqueue(async () => {
+                        isApplyingRemote = true;
+                        try {
+                            await graph.importNode(data);
+                            await egWalker.mergeRemote(data.cid);
+                        } catch (err) {
+                            console.error('[MerkleEGWalker] Failed to merge remote node:', err);
+                        }
+                        isApplyingRemote = false;
+                    });
                 }
             });
 

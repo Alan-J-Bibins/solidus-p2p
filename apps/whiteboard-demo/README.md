@@ -134,13 +134,13 @@ That's it! No manual message serialization, no conflict resolution logic, no con
 
 ## Comparison: Solidus vs Raw WebRTC
 
-**With Solidus** (~50 lines):
+**With Solidus**:
 
 - Define state shape
 - Mutate state normally
 - Solidus handles the rest
 
-**Without Solidus** (~300+ lines):
+**Without Solidus**, you'd need to hand-roll:
 
 - Manual WebRTC connection setup
 - Signaling server protocol
@@ -149,6 +149,10 @@ That's it! No manual message serialization, no conflict resolution logic, no con
 - State reconciliation logic
 - Peer discovery and management
 
+For actual measured LOC figures (not a rough estimate) and the methodology behind them, see
+[LOC Comparison Methodology](#loc-comparison-methodology) below, and the live comparison at the
+bottom of the running demo page.
+
 ## Technical Details
 
 - **State Sync**: Merkle-EG-Walker algorithm for CRDT-based synchronization with DAG tracking
@@ -156,3 +160,52 @@ That's it! No manual message serialization, no conflict resolution logic, no con
 - **Operations**: Array insert/delete operations for stroke management
 - **Rendering**: HTML5 Canvas with immediate mode drawing
 - **Conflict Resolution**: EgWalker's prepare/effect version tracking handles concurrent edits
+
+## LOC Comparison Methodology
+
+The "Implementation Comparison" panel at the bottom of the running demo shows measured lines of
+code, not guesses. The source of truth is `scripts/count-loc.mjs`; it writes `src/loc-stats.json`,
+which `src/main.ts` imports to render the panel. **Recalculate after any code change** with:
+
+```bash
+npm run loc
+```
+
+**Unit**: non-blank, non-comment source lines (block and line comments stripped for `.ts`/`.css`;
+`index.html` has none to strip).
+
+**With Solidus** — this demo's own application source, counted directly:
+
+- `src/main.ts`, `src/style.css`, `index.html`
+
+**Without Solidus** — the same application files (assumed unchanged: canvas drawing, toolbar,
+connection controls, and DOM wiring don't depend on Solidus) **plus** a measured count of the
+`packages/core` source files that implement the networking and CRDT/state-sync behavior this app
+currently gets from Solidus, traced directly from `main.ts`'s imports:
+
+| Responsibility                        | Solidus API used               | Files counted                                                                                                                          |
+| ------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Event bus, plugin wiring, state proxy | `solidus()`, `createState()`   | `index.ts`, `types.ts`, `state-sync/index.ts`, `state-sync/apply-operation.ts`, `state-sync/datatypes/array.ts`, `state-sync/types.ts` |
+| Signaling + WebRTC mesh transport     | `webrtc()`, `network.create()` | `networking/create-networking-plugin.ts`, `networking/signaling-client.ts`, `networking/types.ts`, `networking/webrtc/*.ts`            |
+| CRDT merge (Merkle DAG, LCA, OT)      | `merkleEGWalker()`             | `state-sync/integrations/merkle-eg-walker/*.ts`                                                                                        |
+
+**Deliberately excluded** from that closure, because this demo doesn't exercise them: the asset
+store / reference tracker (no images), `features/fastcdc` and `features/swarm-chunking` (no asset
+chunking), `state-sync/integrations/yjs.ts` (an alternate CRDT this demo doesn't use), and
+`networking/server.ts` (this demo's signaling server, `apps/signaling-server`, is a plain `ws`
+relay with no Solidus dependency — common infrastructure, counted on neither side).
+
+**What's measured vs. estimated**: both sides of the comparison are measured by counting real
+source files — nothing here is a guess. The caveat is scope, not precision: the
+`packages/core` closure is library-grade code that handles more generality than this one demo
+strictly needs (e.g. `datatypes/array.ts` implements every `Array.prototype` mutator; this demo
+only exercises `push` and `length = 0`). A hand-minimized, single-purpose rewrite could come in
+smaller than this measured figure — or larger, if written less carefully (the whole point of
+Solidus's CRDT layer is to avoid exactly the kind of correctness bugs a quick hand-rolled merge
+tends to hit). We don't fabricate a "trimmed" estimate for that hypothetical rewrite; the
+comparison reports the measured size of the equivalent functionality as it actually exists in this
+codebase today, and discloses this caveat instead of hiding it.
+
+**Formulas**: `lines saved = LOC without Solidus − LOC with Solidus`;
+`% reduction = (lines saved / LOC without Solidus) × 100`. Full line-by-line figures and the
+methodology text are in `src/loc-stats.json`.

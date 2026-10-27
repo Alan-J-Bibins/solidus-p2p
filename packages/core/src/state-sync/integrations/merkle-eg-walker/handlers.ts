@@ -31,10 +31,24 @@ export class ArrayHandler implements OperationHandler {
     apply(state: any, operation: StateOperation): void {
         const { path, type, value } = operation;
 
+        // ARRAY_INSERT/DELETE/UPDATE address an element: path's last segment
+        // is the index, and everything before it locates the array. But
+        // ARRAY_RESIZE/ARRAY_REPLACE (length=, sort, reverse, fill, clear())
+        // address the whole array itself: path's last segment is the
+        // array's own key in its parent, not an index. One extra level of
+        // navigation is needed to reach the actual array in that case.
+        const isWholeArrayOp = type === 'ARRAY_RESIZE' || type === 'ARRAY_REPLACE';
+
         let node = state;
         for (let i = 0; i < path.length - 1; i++) {
             node = node?.[path[i]];
             if (node == null) return;
+        }
+
+        const key = path[path.length - 1];
+
+        if (isWholeArrayOp) {
+            node = node?.[key];
         }
 
         // Use __applyRemote if available (for proxied arrays)
@@ -44,8 +58,6 @@ export class ArrayHandler implements OperationHandler {
         }
 
         // Fallback for raw arrays
-        const key = path[path.length - 1];
-
         if (!Array.isArray(node)) return;
 
         switch (type) {

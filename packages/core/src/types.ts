@@ -12,6 +12,14 @@ export type SolidusEvents = {
      * For emitting events with any payload
      */
     emit: (event: string, ...args: any[]) => void;
+
+    /**
+     * Whether any handler is registered for this event. Lets a plugin
+     * detect whether another plugin (e.g. a state-sync integration) is
+     * already handling an event, to avoid double-processing the same
+     * operation.
+     */
+    hasListeners: (event: string) => boolean;
 };
 
 export type SolidusPlugin<TResources extends Record<string, any> = Record<string, any>> = {

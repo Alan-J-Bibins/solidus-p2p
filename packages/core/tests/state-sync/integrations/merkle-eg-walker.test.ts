@@ -234,6 +234,40 @@ describe('Merkle Eg Walker Plugin', () => {
                 expect(state.items).toEqual(['a', 'x', 'c']);
             });
 
+            // Regression: ARRAY_RESIZE/ARRAY_REPLACE address the array itself
+            // (path's last segment is the array's own key), unlike
+            // INSERT/DELETE/UPDATE (path's last segment is an element index).
+            // A remote "clear board" (strokes.length = 0) is an ARRAY_RESIZE.
+            test('ARRAY_RESIZE truncates the array itself, not an element', () => {
+                const handler = new ArrayHandler();
+                const state = { items: ['a', 'b', 'c'] };
+                const op: StateOperation = {
+                    type: 'ARRAY_RESIZE',
+                    path: ['items'],
+                    value: 0,
+                    timestamp: Date.now(),
+                };
+
+                handler.apply(state, op);
+
+                expect(state.items).toEqual([]);
+            });
+
+            test('ARRAY_REPLACE replaces the array itself, not an element', () => {
+                const handler = new ArrayHandler();
+                const state = { items: ['a', 'b', 'c'] };
+                const op: StateOperation = {
+                    type: 'ARRAY_REPLACE',
+                    path: ['items'],
+                    value: ['x', 'y'],
+                    timestamp: Date.now(),
+                };
+
+                handler.apply(state, op);
+
+                expect(state.items).toEqual(['x', 'y']);
+            });
+
             test('transform adjusts index for concurrent insert', () => {
                 const handler = new ArrayHandler();
                 const op: StateOperation = {
@@ -796,6 +830,44 @@ describe('Merkle Eg Walker Plugin', () => {
             // Last writer wins (deterministic based on Lamport + peerId)
             expect(mergedState.a).toBeDefined();
             expect([2, 3]).toContain(mergedState.a);
+        });
+
+        // Regression: when the merged remote node is itself the LCA (the
+        // common case — it's typically already the sole frontier item),
+        // its lamport is absent from the "ops strictly between frontier and
+        // LCA" list, so it must still be folded into lamportCounter
+        // explicitly. Otherwise the next local op can be assigned a lamport
+        // that collides with (and sorts before) the already-merged remote
+        // op, corrupting replay order.
+        test('lamportCounter does not fall behind when the merged remote node is the LCA', async () => {
+            const graph = new MerkleEventGraph();
+            const remoteOp: StateOperation = {
+                type: 'SET',
+                path: ['a'],
+                value: 1,
+                timestamp: Date.now(),
+            };
+            const remoteCid = await graph.addNode(remoteOp, [], 5, 'peer2');
+
+            const dagSyncer = {
+                getNode: async (cid: string) => graph.getNode(cid),
+            } as any;
+            const state = { a: 0, b: 0 };
+            const walker = new EgWalker(graph, dagSyncer, state, 'peer1');
+
+            await walker.mergeRemote(remoteCid);
+            expect(walker.lamportCounter).toBeGreaterThanOrEqual(5);
+
+            const localOp: StateOperation = {
+                type: 'SET',
+                path: ['b'],
+                value: 2,
+                timestamp: Date.now(),
+            };
+            const localCid = await walker.applyLocal(localOp);
+            const localNode = graph.getNode(localCid);
+
+            expect(localNode!.lamport).toBeGreaterThan(5);
         });
     });
 });

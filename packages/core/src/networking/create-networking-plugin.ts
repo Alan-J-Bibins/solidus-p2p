@@ -87,6 +87,15 @@ export function createNetworkingPlugin<
             });
 
             events.on('state:operation', (op: StateOperation) => {
+                // A state-sync plugin (merkleEGWalker, yjs, etc.) owns
+                // broadcasting + conflict resolution for this operation via
+                // 'state:broadcast'. Broadcasting the raw op here too would
+                // make peers apply the same operation twice: once directly,
+                // once through the state-sync plugin's merge. Only fall back
+                // to broadcasting the raw operation when no state-sync
+                // plugin is registered.
+                if (events.hasListeners('state:broadcast')) return;
+
                 const payload = JSON.stringify({
                     kind: 'state-update',
                     op: { ...op, value: serializeNetworkValue(op.value) },

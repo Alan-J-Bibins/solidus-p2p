@@ -193,12 +193,283 @@ button:disabled {
     background: #fff;
 }
 
+/* --- LOC Comparison --- */
+
+.loc-section {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 24px;
+}
+
+.loc-section h3 {
+    margin-bottom: 8px;
+}
+
+.loc-explainer {
+    margin: 0 0 20px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #777;
+}
+
+.loc-explainer code {
+    background: #f0f0f0;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 12px;
+}
+
+.loc-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.loc-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 16px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    background: #fafafa;
+}
+
+.loc-card-highlight {
+    border-color: #4a90d9;
+    background: rgba(74, 144, 217, 0.08);
+}
+
+.loc-card-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+}
+
+.loc-card-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: #333;
+}
+
+.loc-card-highlight .loc-card-value {
+    color: #357abd;
+}
+
+.loc-card-sub {
+    font-size: 12px;
+    color: #999;
+}
+
+.loc-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.loc-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.loc-bar-label {
+    flex: 0 0 120px;
+    font-size: 13px;
+    color: #666;
+}
+
+.loc-bar-track {
+    flex: 1;
+    height: 14px;
+    border-radius: 7px;
+    background: #eee;
+    overflow: hidden;
+}
+
+.loc-bar-fill {
+    height: 100%;
+    border-radius: 7px;
+}
+
+.loc-bar-without {
+    background: #bbb;
+}
+
+.loc-bar-with {
+    background: #4a90d9;
+}
+
+.loc-summary {
+    display: flex;
+    gap: 24px;
+    font-size: 14px;
+    color: #555;
+    border-top: 1px solid #eee;
+    padding-top: 14px;
+}
+
+.loc-summary strong {
+    color: #357abd;
+}
+
+/* --- Code Comparison --- */
+
+.code-compare {
+    border-top: 1px solid #eee;
+    margin-top: 20px;
+    padding-top: 20px;
+}
+
+.code-compare h4 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+}
+
+.code-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.code-tab-btn {
+    padding: 8px 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.code-tab-btn:hover {
+    background: #f0f0f0;
+}
+
+.code-tab-btn.active {
+    background: #4a90d9;
+    border-color: #4a90d9;
+    color: #fff;
+}
+
+.code-panels {
+    display: block;
+    min-width: 0;
+}
+
+.code-panel {
+    display: none;
+    min-width: 0;
+}
+
+.code-panel.active {
+    display: block;
+}
+
+.code-snippet {
+    background: #fafafa;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.code-snippet h5 {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.code-snippet-meta {
+    font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+    font-size: 11px;
+    color: #4a90d9;
+    margin-bottom: 10px;
+}
+
+.code-snippet pre {
+    margin: 0;
+    padding: 12px;
+    border-radius: 6px;
+    background: #272822;
+    overflow-x: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.code-snippet pre code {
+    font-family: ui-monospace, 'SF Mono', Consolas, 'Liberation Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #f8f8f2;
+    white-space: pre;
+}
+
+@media (min-width: 900px) {
+    .code-tabs {
+        display: none;
+    }
+
+    .code-panels {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .code-panel {
+        display: block;
+        min-width: 0;
+    }
+
+    .code-panel::before {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #999;
+    }
+
+    #codePanelWith::before {
+        content: 'With Solidus';
+    }
+
+    #codePanelWithout::before {
+        content: 'Without Solidus';
+    }
+}
+
 @media (max-width: 640px) {
     .config-grid {
         grid-template-columns: 1fr;
     }
 
     .toolbar {
+        flex-wrap: wrap;
+    }
+
+    .loc-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .loc-bar-label {
+        flex: 0 0 90px;
+    }
+
+    .code-tabs {
         flex-wrap: wrap;
     }
 }

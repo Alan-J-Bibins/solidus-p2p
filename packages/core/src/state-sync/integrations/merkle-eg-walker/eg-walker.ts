@@ -219,6 +219,12 @@ export class EgWalker<TState> {
     peerId: string;
     handlerRegistry: OperationHandlerRegistry;
     private onRemoteApplied?: (state: TState) => void;
+    // A pristine, pre-any-operation snapshot of the state, used as the
+    // replay base in rebuildStateFromLCA(). Cloning `this.state` there
+    // instead would re-apply every historical operation on top of a
+    // state that (after the first merge) already reflects them, silently
+    // duplicating array inserts etc. on every subsequent merge.
+    private genesisState: TState;
 
     constructor(
         graph: MerkleEventGraph,
@@ -230,6 +236,7 @@ export class EgWalker<TState> {
         this.graph = graph;
         this.dagSyncer = dagSyncer;
         this.state = state;
+        this.genesisState = this.cloneState(state);
         this.lamportCounter = 0;
         this.peerId = peerId;
         this.handlerRegistry = new OperationHandlerRegistry();
@@ -242,14 +249,15 @@ export class EgWalker<TState> {
 
     setState(state: TState) {
         this.state = state;
+        this.genesisState = this.cloneState(state);
     }
 
-    async applyLocal(operation: StateOperation) {
+    async applyLocal(operation: StateOperation): Promise<string> {
         const handler = this.handlerRegistry.getHandler(operation.type);
         handler.apply(this.state, operation);
         this.lamportCounter++;
         const parents = this.graph.getFrontier();
-        await this.graph.addNode(operation, parents, this.lamportCounter, this.peerId);
+        return this.graph.addNode(operation, parents, this.lamportCounter, this.peerId);
     }
 
     private async findLCA(frontier: string[], remoteCid: string): Promise<string> {
@@ -404,8 +412,11 @@ export class EgWalker<TState> {
         const opsToLCA = this.getAllOperationsTo(lcaCid);
         opsToLCA.sort((a, b) => a.lamport - b.lamport);
 
-        // Clone the current state structure to preserve Maps, Sets, etc.
-        const freshState = this.cloneState(this.state) as TState;
+        // Replay from the pristine genesis snapshot, not `this.state`:
+        // `this.state` already reflects every previously-merged operation,
+        // and opsToLCA includes the full ancestor chain again, so starting
+        // from `this.state` would re-apply (duplicate) every op each time.
+        const freshState = this.cloneState(this.genesisState) as TState;
 
         for (const op of opsToLCA) {
             const handler = this.handlerRegistry.getHandler(op.operation.type);
@@ -499,15 +510,31 @@ export class EgWalker<TState> {
                 }
             }
 
-            const handler = this.handlerRegistry.getHandler(transformedOp.type);
-            handler.apply(internalState.getState(), transformedOp);
-
+            // internalState.apply() applies transformedOp to both the
+            // prepare and effect states internally — applying it here too
+            // would double-apply every merged operation (e.g. duplicating
+            // every ARRAY_INSERT).
             internalState.apply(op.cid, transformedOp);
         }
 
         this.state = internalState.getState();
 
-        const maxLamport = Math.max(...allOps.map((op) => op.lamport), this.lamportCounter);
+        // allOps only covers operations strictly between the frontier and
+        // the LCA (exclusive of the LCA itself). When the merged remote
+        // node IS the LCA — the common case, since it's typically already
+        // the sole item on the frontier by the time this runs — its own
+        // lamport is absent from allOps entirely. Without counting it here
+        // too, this.lamportCounter can fall behind, and the next local
+        // operation can be assigned a lamport that collides with (and
+        // sorts before) an already-merged remote operation, corrupting
+        // replay order (e.g. a later insert being undone by an earlier
+        // clear on replay).
+        const remoteLamport = this.graph.getNode(remoteCid)?.lamport ?? 0;
+        const maxLamport = Math.max(
+            ...allOps.map((op) => op.lamport),
+            remoteLamport,
+            this.lamportCounter,
+        );
         this.lamportCounter = maxLamport;
 
         // Emit event to notify that remote operations have been applied

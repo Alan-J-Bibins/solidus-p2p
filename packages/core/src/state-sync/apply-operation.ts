@@ -27,6 +27,15 @@ export function applyOperation(
 
     const key = path[path.length - 1];
 
+    // ARRAY_RESIZE/ARRAY_REPLACE address the whole array itself (path's
+    // last segment is the array's own key, not an element index), unlike
+    // the other ARRAY_* ops. One extra level of navigation reaches the
+    // actual array.
+    if (type === 'ARRAY_RESIZE' || type === 'ARRAY_REPLACE') {
+        node = node?.[key];
+        if (node == null) return;
+    }
+
     switch (type) {
         case 'SET': {
             const oldValue = node[key];

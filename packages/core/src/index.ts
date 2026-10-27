@@ -36,6 +36,7 @@ export function solidus<TPlugins extends SolidusPlugin<any>[]>(
         emit: (event: string, ...args: any[]) => {
             handlers[event]?.forEach((handler) => handler(...args));
         },
+        hasListeners: (event: string) => (handlers[event]?.length ?? 0) > 0,
     };
 
     const defaultConfig: SolidusConfig = {};

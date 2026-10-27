@@ -1,0 +1,134 @@
+{
+    "generatedAt": "2026-10-27T08:44:03.177Z",
+    "methodology": {
+        "unit": "non-blank, non-comment source lines",
+        "withSolidus": "This demo's own application source (src/main.ts, src/style.css, index.html).",
+        "withoutSolidus": "withSolidus total + a MEASURED count of the packages/core files that implement the networking + CRDT/state-sync behavior this demo gets from Solidus, traced from its imports (solidus, webrtc, merkleEGWalker, createState). Assumes the app's own UI/canvas/connection-control code is unchanged either way. See README.md for the full writeup and known caveats (the measured closure is library-grade, more general than this one demo strictly needs, so a hand-minimized rewrite could differ from it).",
+        "valueType": "measured"
+    },
+    "withSolidus": {
+        "files": [
+            {
+                "path": "src/main.ts",
+                "loc": 578
+            },
+            {
+                "path": "src/style.css",
+                "loc": 393
+            },
+            {
+                "path": "index.html",
+                "loc": 12
+            }
+        ],
+        "total": 983
+    },
+    "withoutSolidus": {
+        "appFiles": [
+            {
+                "path": "src/main.ts",
+                "loc": 578
+            },
+            {
+                "path": "src/style.css",
+                "loc": 393
+            },
+            {
+                "path": "index.html",
+                "loc": 12
+            }
+        ],
+        "equivalentClosure": {
+            "files": [
+                {
+                    "path": "index.ts",
+                    "loc": 92
+                },
+                {
+                    "path": "types.ts",
+                    "loc": 44
+                },
+                {
+                    "path": "networking/create-networking-plugin.ts",
+                    "loc": 169
+                },
+                {
+                    "path": "networking/signaling-client.ts",
+                    "loc": 81
+                },
+                {
+                    "path": "networking/types.ts",
+                    "loc": 54
+                },
+                {
+                    "path": "networking/webrtc/index.ts",
+                    "loc": 16
+                },
+                {
+                    "path": "networking/webrtc/peer.ts",
+                    "loc": 150
+                },
+                {
+                    "path": "networking/webrtc/send-queue.ts",
+                    "loc": 67
+                },
+                {
+                    "path": "networking/webrtc/transport.ts",
+                    "loc": 137
+                },
+                {
+                    "path": "networking/webrtc/types.ts",
+                    "loc": 13
+                },
+                {
+                    "path": "state-sync/index.ts",
+                    "loc": 159
+                },
+                {
+                    "path": "state-sync/apply-operation.ts",
+                    "loc": 121
+                },
+                {
+                    "path": "state-sync/datatypes/array.ts",
+                    "loc": 345
+                },
+                {
+                    "path": "state-sync/types.ts",
+                    "loc": 31
+                },
+                {
+                    "path": "state-sync/integrations/merkle-eg-walker/dag-syncer.ts",
+                    "loc": 104
+                },
+                {
+                    "path": "state-sync/integrations/merkle-eg-walker/eg-walker.ts",
+                    "loc": 381
+                },
+                {
+                    "path": "state-sync/integrations/merkle-eg-walker/event-graph.ts",
+                    "loc": 62
+                },
+                {
+                    "path": "state-sync/integrations/merkle-eg-walker/handlers.ts",
+                    "loc": 230
+                },
+                {
+                    "path": "state-sync/integrations/merkle-eg-walker/index.ts",
+                    "loc": 152
+                },
+                {
+                    "path": "state-sync/integrations/merkle-eg-walker/types.ts",
+                    "loc": 8
+                },
+                {
+                    "path": "state-sync/integrations/merkle-eg-walker/utils.ts",
+                    "loc": 7
+                }
+            ],
+            "total": 2423
+        },
+        "total": 3406
+    },
+    "linesSaved": 2423,
+    "percentReduction": 71.13916617733412
+}
