@@ -98,6 +98,7 @@ let network: NetworkHandle | null = null;
 // Current stroke being drawn (not yet committed to shared state)
 let currentStroke: Stroke | null = null;
 let isDrawing = false;
+let isApplyingRemoteState = false;
 
 // --- Drawing Functions ---
 
@@ -163,7 +164,7 @@ canvas.addEventListener('mousemove', (e) => {
 });
 
 canvas.addEventListener('mouseup', () => {
-    if (!isDrawing || !currentStroke || !docState) {
+    if (!isDrawing || !currentStroke || !docState || isApplyingRemoteState) {
         isDrawing = false;
         currentStroke = null;
         return;
@@ -182,7 +183,13 @@ canvas.addEventListener('mouseup', () => {
 
 canvas.addEventListener('mouseleave', () => {
     // Treat mouseleave like mouseup
-    if (isDrawing && currentStroke && docState && currentStroke.points.length >= 2) {
+    if (
+        isDrawing &&
+        currentStroke &&
+        docState &&
+        !isApplyingRemoteState &&
+        currentStroke.points.length >= 2
+    ) {
         docState.strokes.push(currentStroke);
         docState.version++;
     }
@@ -194,14 +201,34 @@ canvas.addEventListener('mouseleave', () => {
 // --- Clear ---
 
 clearBtn.addEventListener('click', () => {
-    if (!docState) return;
+    if (!docState || isApplyingRemoteState) return;
+
+    console.log('[Clear] Clearing all strokes, current count:', docState.strokes.length);
+
     // Clear all strokes by setting length to 0 (triggers ARRAY_RESIZE)
     docState.strokes.length = 0;
     docState.version++;
+
+    console.log('[Clear] Strokes cleared, broadcasting to peers');
     redraw();
 });
 
 // --- Connection ---
+
+const STORAGE_KEY = 'whiteboard-offline-state';
+
+// Save state to localStorage before unload
+window.addEventListener('beforeunload', () => {
+    if (docState) {
+        const stateToSave = {
+            strokes: docState.strokes,
+            version: docState.version,
+            timestamp: Date.now(),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+        console.log('[Storage] Saved state to localStorage, strokes:', docState.strokes.length);
+    }
+});
 
 connectBtn.addEventListener('click', async () => {
     const signalingServer = document
@@ -225,10 +252,31 @@ connectBtn.addEventListener('click', async () => {
             },
         });
 
+        // Create state with offline data if available
         rawDocState = {
             strokes: [],
             version: 0,
         };
+
+        // Check for offline state in localStorage
+        const savedStateJson = localStorage.getItem(STORAGE_KEY);
+        if (savedStateJson) {
+            try {
+                const savedState = JSON.parse(savedStateJson);
+                if (savedState.strokes && Array.isArray(savedState.strokes)) {
+                    rawDocState.strokes = savedState.strokes;
+                    rawDocState.version = savedState.version || 0;
+                    console.log(
+                        '[Storage] Restored offline state, strokes:',
+                        savedState.strokes.length,
+                    );
+                }
+                // Clear the saved state after restoring
+                localStorage.removeItem(STORAGE_KEY);
+            } catch (err) {
+                console.error('[Storage] Failed to parse saved state:', err);
+            }
+        }
 
         docState = solidusInstance.createState(rawDocState, (op) => {
             console.log('[State] Update:', op.type, op.path);
@@ -258,6 +306,14 @@ connectBtn.addEventListener('click', async () => {
         network!.onPeerJoin((peerId) => {
             console.log('[Network] Peer joined:', peerId);
             connectionStatus.textContent = `Connected to "${roomName}" (${network!.peers.length} peers)`;
+
+            // Request current state from the new peer
+            const stateRequest = JSON.stringify({
+                kind: 'state-request',
+                from: network!.localPeerId,
+            });
+            network!.send(peerId, stateRequest);
+            console.log('[Network] Requested state from peer:', peerId);
         });
 
         network!.onPeerLeave((peerId) => {
@@ -267,6 +323,58 @@ connectBtn.addEventListener('click', async () => {
 
         network!.onMessage((peerId, data) => {
             console.log('[Network] Message from peer:', peerId, data);
+
+            try {
+                const message = JSON.parse(data);
+
+                // Handle state request from new peer
+                if (message.kind === 'state-request' && docState) {
+                    console.log('[Network] Sending current state to peer:', peerId);
+                    const stateResponse = JSON.stringify({
+                        kind: 'state-response',
+                        state: {
+                            strokes: docState.strokes,
+                            version: docState.version,
+                        },
+                    });
+                    network!.send(peerId, stateResponse);
+                }
+
+                // Handle state response from existing peer
+                if (message.kind === 'state-response' && docState && message.state) {
+                    console.log('[Network] Received state from peer:', peerId, message.state);
+
+                    // Merge strokes by combining all unique strokes (dedup by stroke ID)
+                    isApplyingRemoteState = true;
+
+                    // Create a map of existing strokes by ID
+                    const strokeMap = new Map<string, Stroke>();
+                    for (const stroke of docState.strokes) {
+                        strokeMap.set(stroke.id, stroke);
+                    }
+
+                    // Add remote strokes (will overwrite if same ID exists)
+                    for (const stroke of message.state.strokes) {
+                        strokeMap.set(stroke.id, stroke);
+                    }
+
+                    // Convert back to array and update state
+                    const mergedStrokes = Array.from(strokeMap.values());
+                    docState.strokes.length = 0;
+                    for (const stroke of mergedStrokes) {
+                        docState.strokes.push(stroke);
+                    }
+
+                    // Take the max version
+                    docState.version = Math.max(docState.version, message.state.version);
+                    isApplyingRemoteState = false;
+
+                    redraw();
+                    console.log('[Network] Merged state, total strokes:', docState.strokes.length);
+                }
+            } catch (err) {
+                console.error('[Network] Failed to parse message:', err);
+            }
         });
 
         connectionStatus.textContent = `Connected to "${roomName}" (waiting for peers...)`;
@@ -282,6 +390,20 @@ connectBtn.addEventListener('click', async () => {
 });
 
 disconnectBtn.addEventListener('click', () => {
+    // Save state before disconnecting
+    if (docState) {
+        const stateToSave = {
+            strokes: docState.strokes,
+            version: docState.version,
+            timestamp: Date.now(),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+        console.log(
+            '[Storage] Saved state to localStorage before disconnect, strokes:',
+            docState.strokes.length,
+        );
+    }
+
     if (network) {
         network.close();
         network = null;
