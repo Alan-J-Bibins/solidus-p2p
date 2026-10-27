@@ -1,0 +1,17 @@
+{
+    "generatedAt": "2026-10-27T13:07:41.797Z",
+    "withSolidus": {
+        "total": 239,
+        "code": 202,
+        "comment": 8,
+        "blank": 29
+    },
+    "withoutSolidus": {
+        "total": 661,
+        "code": 555,
+        "comment": 5,
+        "blank": 101
+    },
+    "locSaved": 353,
+    "reductionPct": 63.60360360360361
+}

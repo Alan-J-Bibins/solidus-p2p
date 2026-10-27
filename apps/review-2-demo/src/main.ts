@@ -5,6 +5,8 @@ import './style.css';
 import { yjs } from '@solidus-p2p/core/state-sync/integrations';
 import Quill from 'quill';
 
+import { renderLocSection } from './loc-section.ts';
+
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div class="container">
     <h2>Collaborative Editor Demo</h2>
@@ -40,16 +42,10 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <h3>Document</h3>
       <div id="editor"></div>
     </div>
-
-    <div class="state-panel">
-      <h3>State Object</h3>
-      <pre id="stateDisplay">{ "content": "", "version": 0 }</pre>
-    </div>
   </div>
 `;
 
 const editorContainer = document.querySelector<HTMLDivElement>('#editor')!;
-const stateDisplay = document.querySelector<HTMLPreElement>('#stateDisplay')!;
 const connectBtn = document.querySelector<HTMLButtonElement>('#connectBtn')!;
 const disconnectBtn = document.querySelector<HTMLButtonElement>('#disconnectBtn')!;
 const connectionStatus = document.querySelector<HTMLSpanElement>('#connectionStatus')!;
@@ -80,12 +76,6 @@ let rawDocState: DocState | null = null;
 let network: NetworkHandle | null = null;
 let isApplyingRemoteChange = false;
 
-function updateStateDisplay(): void {
-    if (docState) {
-        stateDisplay.textContent = JSON.stringify(docState, null, 2);
-    }
-}
-
 // Local user edits -> broadcast to peers
 quill.on('text-change', (_delta, _oldDelta, source) => {
     console.log(
@@ -99,7 +89,6 @@ quill.on('text-change', (_delta, _oldDelta, source) => {
         docState.content = quill.root.innerHTML;
         docState.version++;
         console.log('[Quill] docState updated, version:', docState.version);
-        updateStateDisplay();
     }
 });
 
@@ -158,9 +147,6 @@ connectBtn.addEventListener('click', async () => {
                     if (selection) quill.setSelection(selection.index, selection.length);
                     quill.root.focus();
                     isApplyingRemoteChange = false;
-
-                    // Update debug display
-                    updateStateDisplay();
                 }
             },
         });
@@ -225,7 +211,6 @@ connectBtn.addEventListener('click', async () => {
         connectBtn.disabled = true;
         disconnectBtn.disabled = false;
 
-        updateStateDisplay();
         console.log('[Connect] Connection complete!');
     } catch (err) {
         console.error('[Connect] Connection failed:', err);
@@ -251,4 +236,4 @@ disconnectBtn.addEventListener('click', () => {
     console.log('[Disconnect] Complete');
 });
 
-updateStateDisplay();
+renderLocSection();
