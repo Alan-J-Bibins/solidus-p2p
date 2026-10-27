@@ -376,26 +376,66 @@ button:disabled {
 }
 
 .code-snippet {
+    position: relative;
     background: #fafafa;
     border: 1px solid #eee;
-    border-radius: 8px;
+    border-left: 3px solid #ccc;
+    border-radius: 10px;
     padding: 14px 16px;
     margin-bottom: 14px;
     min-width: 0;
     box-sizing: border-box;
+    transition:
+        box-shadow 0.2s,
+        border-color 0.2s;
+}
+
+#codePanelWith .code-snippet {
+    border-left-color: #4a90d9;
+}
+
+#codePanelWithout .code-snippet {
+    border-left-color: #e74c3c;
+}
+
+.code-snippet:hover {
+    border-color: #ddd;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.code-snippet-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
 }
 
 .code-snippet h5 {
-    margin: 0 0 4px;
+    margin: 0;
     font-size: 14px;
     font-weight: 600;
     color: #333;
 }
 
+.code-snippet-badge {
+    flex-shrink: 0;
+    background: #eee;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+    font-size: 11px;
+    color: #777;
+}
+
 .code-snippet-meta {
+    display: inline-block;
     font-family: ui-monospace, 'SF Mono', Consolas, monospace;
     font-size: 11px;
     color: #4a90d9;
+    background: rgba(74, 144, 217, 0.08);
+    border-radius: 4px;
+    padding: 2px 6px;
     margin-bottom: 10px;
 }
 
@@ -404,17 +444,33 @@ button:disabled {
     padding: 12px;
     border-radius: 6px;
     background: #272822;
-    overflow-x: auto;
     max-width: 100%;
+    max-height: 280px;
+    overflow-y: auto;
+    overflow-x: hidden;
     box-sizing: border-box;
 }
 
 .code-snippet pre code {
+    display: block;
     font-family: ui-monospace, 'SF Mono', Consolas, 'Liberation Mono', monospace;
     font-size: 12.5px;
     line-height: 1.5;
     color: #f8f8f2;
-    white-space: pre;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.code-snippet::after {
+    content: '';
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 14px;
+    height: 20px;
+    border-radius: 0 0 6px 6px;
+    background: linear-gradient(to bottom, transparent, #272822);
+    pointer-events: none;
 }
 
 @media (min-width: 900px) {
@@ -435,20 +491,25 @@ button:disabled {
 
     .code-panel::before {
         display: block;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
         font-size: 12px;
-        font-weight: 600;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.04em;
-        color: #999;
+        border-bottom: 2px solid #eee;
     }
 
     #codePanelWith::before {
         content: 'With Solidus';
+        color: #4a90d9;
+        border-bottom-color: #4a90d9;
     }
 
     #codePanelWithout::before {
         content: 'Without Solidus';
+        color: #e74c3c;
+        border-bottom-color: #e74c3c;
     }
 }
 

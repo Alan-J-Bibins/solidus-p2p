@@ -1,5 +1,5 @@
 {
-    "generatedAt": "2026-10-27T08:44:03.177Z",
+    "generatedAt": "2026-10-27T12:52:26.188Z",
     "methodology": {
         "unit": "non-blank, non-comment source lines",
         "withSolidus": "This demo's own application source (src/main.ts, src/style.css, index.html).",
@@ -10,7 +10,7 @@
         "files": [
             {
                 "path": "src/main.ts",
-                "loc": 578
+                "loc": 513
             },
             {
                 "path": "src/style.css",
@@ -21,13 +21,13 @@
                 "loc": 12
             }
         ],
-        "total": 983
+        "total": 918
     },
     "withoutSolidus": {
         "appFiles": [
             {
                 "path": "src/main.ts",
-                "loc": 578
+                "loc": 513
             },
             {
                 "path": "src/style.css",
@@ -127,8 +127,8 @@
             ],
             "total": 2423
         },
-        "total": 3406
+        "total": 3341
     },
     "linesSaved": 2423,
-    "percentReduction": 71.13916617733412
+    "percentReduction": 72.52319664771026
 }

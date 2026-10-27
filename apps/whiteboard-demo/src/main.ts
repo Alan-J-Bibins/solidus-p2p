@@ -2,6 +2,7 @@ import { solidus, webrtc, type NetworkHandle } from '@solidus-p2p/core';
 import { merkleEGWalker } from '@solidus-p2p/core/state-sync/integrations';
 
 import locStats from './loc-stats.json';
+import ownSource from './main.ts?raw';
 
 import './style.css';
 
@@ -392,33 +393,26 @@ connectBtn.addEventListener('click', async () => {
                 if (message.kind === 'state-response' && docState && message.state) {
                     console.log('[Network] Received state from peer:', peerId, message.state);
 
-                    // Merge strokes by combining all unique strokes (dedup by stroke ID)
-                    isApplyingRemoteState = true;
-
-                    // Create a map of existing strokes by ID
-                    const strokeMap = new Map<string, Stroke>();
-                    for (const stroke of docState.strokes) {
-                        strokeMap.set(stroke.id, stroke);
+                    // Whichever side has the newer version wins outright. A
+                    // union-by-stroke-id merge can never represent a Clear
+                    // (it only ever adds strokes, so a peer catching up after
+                    // someone cleared would resurrect the old strokes and
+                    // push them back out to everyone). version always
+                    // increases on both push and clear, so comparing it
+                    // picks the side whose stroke set (including an emptied
+                    // one) is actually current.
+                    if (message.state.version > docState.version) {
+                        isApplyingRemoteState = true;
+                        docState.strokes.length = 0;
+                        for (const stroke of message.state.strokes) {
+                            docState.strokes.push(stroke);
+                        }
+                        docState.version = message.state.version;
+                        isApplyingRemoteState = false;
+                        redraw();
                     }
 
-                    // Add remote strokes (will overwrite if same ID exists)
-                    for (const stroke of message.state.strokes) {
-                        strokeMap.set(stroke.id, stroke);
-                    }
-
-                    // Convert back to array and update state
-                    const mergedStrokes = Array.from(strokeMap.values());
-                    docState.strokes.length = 0;
-                    for (const stroke of mergedStrokes) {
-                        docState.strokes.push(stroke);
-                    }
-
-                    // Take the max version
-                    docState.version = Math.max(docState.version, message.state.version);
-                    isApplyingRemoteState = false;
-
-                    redraw();
-                    console.log('[Network] Merged state, total strokes:', docState.strokes.length);
+                    console.log('[Network] Synced state, total strokes:', docState.strokes.length);
                 }
             } catch (err) {
                 console.error('[Network] Failed to parse message:', err);
@@ -490,114 +484,88 @@ interface CodeSnippet {
     code: string;
 }
 
-// Verbatim from src/main.ts in this repository (line numbers as of this writing).
-const withSolidusSnippets: CodeSnippet[] = [
-    {
-        title: 'Configuring Solidus and registering plugins',
-        source: 'apps/whiteboard-demo/src/main.ts:286-296',
-        code: `solidusInstance = solidus({
-    plugins: [webrtc(), merkleEGWalker({})],
-    onStateOperation: (op) => {
-        console.log('[Solidus] Local operation:', op.type, op.path);
-    },
-    onRemoteOperation: (_op, peerId) => {
-        console.log('[Solidus] Remote operation from:', peerId);
-        // Redraw canvas when remote state changes
-        redraw();
-    },
-});`,
-    },
-    {
-        title: 'Creating shared state and connecting to peers',
-        source: 'apps/whiteboard-demo/src/main.ts:324-343',
-        code: `docState = solidusInstance.createState(rawDocState, (op) => {
-    console.log('[State] Update:', op.type, op.path);
-    // Redraw canvas whenever state changes (local or remote)
-    redraw();
-});
-
-network = solidusInstance.create({
-    type: 'peer-network',
-    config: {
-        target: rawDocState,
-        signalingServer,
-        room: roomName,
-        iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun.cloudflare.com:3478' },
-        ],
-    },
-});`,
-    },
-    {
-        title: 'Updating the shared drawing state',
-        source: 'apps/whiteboard-demo/src/main.ts:216-220, 251-253',
-        code: `// Commit the stroke to shared state
-if (currentStroke.points.length >= 2) {
-    docState.strokes.push(currentStroke);
-    docState.version++;
+// Sliced live out of this file's own ?raw source (not hand-copied), so these
+// can never go stale the way fixed line-number citations would. Scoped to
+// the same sync-relevant logic the "Without Solidus" snippets illustrate —
+// not the whole file — so the two sides stay a fair comparison; the full
+// file is 690+ lines, most of it canvas/DOM code neither side varies on.
+function slice(startMarker: string, endMarkerExclusive: string): string {
+    const start = ownSource.indexOf(startMarker);
+    const end = start === -1 ? -1 : ownSource.indexOf(endMarkerExclusive, start);
+    if (start === -1 || end === -1)
+        return '// [snippet marker not found — main.ts changed, re-check loc section]';
+    return ownSource.slice(start, end).trimEnd();
 }
 
-// Clear all strokes by setting length to 0 (triggers ARRAY_RESIZE)
-docState.strokes.length = 0;
-docState.version++;`,
+// Each pair below (with vs without) covers the exact same responsibility,
+// in the same order on both sides, so the two columns line up row-for-row
+// instead of comparing unrelated chunks of code.
+const withSolidusSnippets: CodeSnippet[] = [
+    {
+        title: 'Setting up networking and handling remote updates',
+        source: 'apps/whiteboard-demo/src/main.ts',
+        code: [
+            slice('solidusInstance = solidus({', '// Create state with offline data if available'),
+            slice('network = solidusInstance.create({', 'await network!.waitUntilOpen();'),
+        ].join('\n\n'),
+    },
+    {
+        title: 'Sharing a local change',
+        source: 'apps/whiteboard-demo/src/main.ts',
+        code: [
+            slice('// Commit the stroke to shared state', '    currentStroke = null;'),
+            slice(
+                '// Clear all strokes by setting length to 0',
+                "    console.log('[Clear] Strokes cleared",
+            ),
+        ].join('\n\n'),
     },
     {
         title: 'Catching up a newly joined peer',
-        source: 'apps/whiteboard-demo/src/main.ts:349-360',
-        code: `network!.onPeerJoin((peerId) => {
-    console.log('[Network] Peer joined:', peerId);
-    connectionStatus.textContent = \`Connected to "\${roomName}" (\${network!.peers.length} peers)\`;
-
-    // Request current state from the new peer
-    const stateRequest = JSON.stringify({
-        kind: 'state-request',
-        from: network!.localPeerId,
-    });
-    network!.send(peerId, stateRequest);
-    console.log('[Network] Requested state from peer:', peerId);
-});`,
+        source: 'apps/whiteboard-demo/src/main.ts',
+        code: slice('network!.onPeerJoin((peerId) => {', '        network!.onPeerLeave'),
     },
 ];
 
 // Illustrative only — this implementation does not exist anywhere in this
 // repository. It sketches the equivalent responsibilities (exchanging
-// updates, ordering/merging them, connection lifecycle) that the snippets
-// above get from Solidus, at roughly the same scope as this demo actually
-// needs (push a stroke, clear the board) — not a general-purpose CRDT.
+// updates, ordering/merging them, connection lifecycle, catch-up) that the
+// snippets above get from Solidus, at roughly the same scope as this demo
+// actually needs (push a stroke, clear the board) — not a general-purpose
+// CRDT. Each title below matches the "With Solidus" snippet it replaces.
 const withoutSolidusSnippets: CodeSnippet[] = [
     {
-        title: 'Broadcasting a local change',
-        code: `let localSeq = 0;
+        title: 'Setting up networking and handling remote updates',
+        code: `signalingSocket.onclose = () => {
+    connectionStatus.textContent = 'Signaling disconnected, retrying…';
+    setTimeout(connectToSignalingServer, retryDelayMs);
+};
 
-function broadcastStrokeAdded(stroke: Stroke) {
-    const message = JSON.stringify({
-        kind: 'stroke-added',
-        peerId: localPeerId,
-        seq: ++localSeq,
-        stroke,
-    });
-    for (const channel of openDataChannels.values()) {
-        if (channel.readyState === 'open') channel.send(message);
-    }
+function setupPeerConnection(peerId: string) {
+    const pc = new RTCPeerConnection({ iceServers });
+    const channel = pc.createDataChannel('whiteboard');
+
+    channel.onopen = () => openDataChannels.set(peerId, channel);
+    channel.onclose = () => openDataChannels.delete(peerId);
+    channel.onerror = (err) => console.error('[P2P] Data channel error:', err);
+    channel.onmessage = (e) => onDataChannelMessage(peerId, e.data);
+
+    pc.onicecandidate = (e) => {
+        if (e.candidate) sendSignal(peerId, { type: 'ice-candidate', candidate: e.candidate });
+    };
+    pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+            openDataChannels.delete(peerId);
+            peerConnections.delete(peerId);
+        }
+    };
+    // ...create/send an SDP offer, handle the answer, apply ICE candidates
+    // from the signaling server, matching the real offer/answer/ICE
+    // exchange this demo's webrtc() plugin already does.
+    return pc;
 }
 
-function broadcastCleared() {
-    const message = JSON.stringify({
-        kind: 'cleared',
-        peerId: localPeerId,
-        seq: ++localSeq,
-    });
-    for (const channel of openDataChannels.values()) {
-        if (channel.readyState === 'open') channel.send(message);
-    }
-}`,
-    },
-    {
-        title: 'Receiving and ordering remote changes',
-        code: `const pendingByPeer = new Map<string, Map<number, any>>();
+const pendingByPeer = new Map<string, Map<number, any>>();
 const nextExpectedSeq = new Map<string, number>();
 
 function onDataChannelMessage(fromPeerId: string, raw: string) {
@@ -628,34 +596,52 @@ function applyRemoteMessage(msg: any) {
 }`,
     },
     {
-        title: 'Connection lifecycle',
-        code: `signalingSocket.onclose = () => {
-    connectionStatus.textContent = 'Signaling disconnected, retrying…';
-    setTimeout(connectToSignalingServer, retryDelayMs);
-};
+        title: 'Sharing a local change',
+        code: `let localSeq = 0;
 
-function setupPeerConnection(peerId: string) {
-    const pc = new RTCPeerConnection({ iceServers });
-    const channel = pc.createDataChannel('whiteboard');
+function broadcastStrokeAdded(stroke: Stroke) {
+    const message = JSON.stringify({
+        kind: 'stroke-added',
+        peerId: localPeerId,
+        seq: ++localSeq,
+        stroke,
+    });
+    for (const channel of openDataChannels.values()) {
+        if (channel.readyState === 'open') channel.send(message);
+    }
+}
 
-    channel.onopen = () => openDataChannels.set(peerId, channel);
-    channel.onclose = () => openDataChannels.delete(peerId);
-    channel.onerror = (err) => console.error('[P2P] Data channel error:', err);
-    channel.onmessage = (e) => onDataChannelMessage(peerId, e.data);
+function broadcastCleared() {
+    const message = JSON.stringify({
+        kind: 'cleared',
+        peerId: localPeerId,
+        seq: ++localSeq,
+    });
+    for (const channel of openDataChannels.values()) {
+        if (channel.readyState === 'open') channel.send(message);
+    }
+}`,
+    },
+    {
+        title: 'Catching up a newly joined peer',
+        code: `function onPeerConnectionOpen(peerId: string) {
+    // New peer has no history yet — send them everything we have.
+    const message = JSON.stringify({
+        kind: 'full-state',
+        peerId: localPeerId,
+        strokes: currentStrokes,
+    });
+    openDataChannels.get(peerId)?.send(message);
+}
 
-    pc.onicecandidate = (e) => {
-        if (e.candidate) sendSignal(peerId, { type: 'ice-candidate', candidate: e.candidate });
-    };
-    pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-            openDataChannels.delete(peerId);
-            peerConnections.delete(peerId);
-        }
-    };
-    // ...create/send an SDP offer, handle the answer, apply ICE candidates
-    // from the signaling server, matching the real offer/answer/ICE
-    // exchange this demo's webrtc() plugin already does.
-    return pc;
+function applyFullState(msg: any) {
+    // Naive: last writer wins — overwrites anything drawn here first,
+    // including a concurrent Clear. A real CRDT merges by operation
+    // history instead of replacing the whole array.
+    if (msg.kind === 'full-state') {
+        currentStrokes = msg.strokes;
+        redraw();
+    }
 }`,
     },
 ];
@@ -666,15 +652,24 @@ function renderCodeSnippets(containerId: string, snippets: CodeSnippet[]) {
         const block = document.createElement('div');
         block.className = 'code-snippet';
 
+        const head = document.createElement('div');
+        head.className = 'code-snippet-head';
+
         const title = document.createElement('h5');
         title.textContent = snippet.title;
+
+        const badge = document.createElement('span');
+        badge.className = 'code-snippet-badge';
+        badge.textContent = `${snippet.code.split('\n').length} lines`;
+
+        head.append(title, badge);
 
         const pre = document.createElement('pre');
         const codeEl = document.createElement('code');
         codeEl.textContent = snippet.code;
         pre.appendChild(codeEl);
 
-        block.append(title);
+        block.append(head);
         if (snippet.source) {
             const meta = document.createElement('div');
             meta.className = 'code-snippet-meta';
