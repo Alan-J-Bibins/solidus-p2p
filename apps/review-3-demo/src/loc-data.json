@@ -1,0 +1,69 @@
+{
+    "generatedAt": "2026-10-27T08:56:01.212Z",
+    "methodology": "Counts src/main.ts only — the file each app's own index.html actually loads (<script type=\"module\" src=\"/src/main.ts\">). Neither app's main.ts imports ./p2p, so src/p2p.ts is dead code on both sides and is excluded from the headline number (reported separately below for transparency). Blank lines and comment-only lines are excluded from the \"code\" count; a trailing inline comment on a code line does not get stripped. HTML/CSS/tsconfig/package.json are configuration, not application logic, and are excluded from both sides equally.",
+    "withSolidus": {
+        "files": [
+            {
+                "file": "src/main.ts",
+                "total": 255,
+                "blank": 32,
+                "comment": 9,
+                "code": 214
+            }
+        ],
+        "total": 255,
+        "blank": 32,
+        "comment": 9,
+        "code": 214
+    },
+    "withoutSolidus": {
+        "files": [
+            {
+                "file": "src/main.ts",
+                "total": 661,
+                "blank": 101,
+                "comment": 5,
+                "code": 555
+            }
+        ],
+        "total": 661,
+        "blank": 101,
+        "comment": 5,
+        "code": 555
+    },
+    "locSaved": 341,
+    "reductionPct": 61.44144144144145,
+    "excludedDeadCode": {
+        "note": "src/p2p.ts in each review-2-source copy — present in both source trees but never imported by main.ts or referenced by index.html. Not counted above; shown here so the exclusion is auditable, not hidden.",
+        "withSolidus": {
+            "files": [
+                {
+                    "file": "src/p2p.ts",
+                    "total": 102,
+                    "blank": 13,
+                    "comment": 0,
+                    "code": 89
+                }
+            ],
+            "total": 102,
+            "blank": 13,
+            "comment": 0,
+            "code": 89
+        },
+        "withoutSolidus": {
+            "files": [
+                {
+                    "file": "src/p2p.ts",
+                    "total": 372,
+                    "blank": 54,
+                    "comment": 0,
+                    "code": 318
+                }
+            ],
+            "total": 372,
+            "blank": 54,
+            "comment": 0,
+            "code": 318
+        }
+    }
+}
