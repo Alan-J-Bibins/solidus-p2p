@@ -1,9 +1,32 @@
 import { solidus, webrtc, type NetworkHandle } from '@solidus-p2p/core';
 import { merkleEGWalker } from '@solidus-p2p/core/state-sync/integrations';
 
+import coreIndex from '../../../packages/core/src/index.ts?raw';
+import coreCreateNetworkingPlugin from '../../../packages/core/src/networking/create-networking-plugin.ts?raw';
+import coreSignalingClient from '../../../packages/core/src/networking/signaling-client.ts?raw';
+import coreNetworkingTypes from '../../../packages/core/src/networking/types.ts?raw';
+import coreWebrtcIndex from '../../../packages/core/src/networking/webrtc/index.ts?raw';
+import coreWebrtcPeer from '../../../packages/core/src/networking/webrtc/peer.ts?raw';
+import coreWebrtcSendQueue from '../../../packages/core/src/networking/webrtc/send-queue.ts?raw';
+import coreWebrtcTransport from '../../../packages/core/src/networking/webrtc/transport.ts?raw';
+import coreWebrtcTypes from '../../../packages/core/src/networking/webrtc/types.ts?raw';
+import coreApplyOperation from '../../../packages/core/src/state-sync/apply-operation.ts?raw';
+import coreArray from '../../../packages/core/src/state-sync/datatypes/array.ts?raw';
+import coreStateSyncIndex from '../../../packages/core/src/state-sync/index.ts?raw';
+import coreDagSyncer from '../../../packages/core/src/state-sync/integrations/merkle-eg-walker/dag-syncer.ts?raw';
+import coreEgWalker from '../../../packages/core/src/state-sync/integrations/merkle-eg-walker/eg-walker.ts?raw';
+import coreEventGraph from '../../../packages/core/src/state-sync/integrations/merkle-eg-walker/event-graph.ts?raw';
+import coreHandlers from '../../../packages/core/src/state-sync/integrations/merkle-eg-walker/handlers.ts?raw';
+import coreMerkleIndex from '../../../packages/core/src/state-sync/integrations/merkle-eg-walker/index.ts?raw';
+import coreMerkleTypes from '../../../packages/core/src/state-sync/integrations/merkle-eg-walker/types.ts?raw';
+import coreMerkleUtils from '../../../packages/core/src/state-sync/integrations/merkle-eg-walker/utils.ts?raw';
+import coreStateSyncTypes from '../../../packages/core/src/state-sync/types.ts?raw';
+import coreTypes from '../../../packages/core/src/types.ts?raw';
+import ownHtml from '../index.html?raw';
 import locStats from './loc-stats.json';
 import ownSource from './main.ts?raw';
 
+import ownStyle from './style.css?raw';
 import './style.css';
 
 // --- Types ---
@@ -480,170 +503,143 @@ function renderLocComparison() {
 
 interface CodeSnippet {
     title: string;
-    source?: string; // file path + lines, when quoting real repository code
+    source?: string; // file path, when quoting real repository code
     code: string;
 }
 
-// Sliced live out of this file's own ?raw source (not hand-copied), so these
-// can never go stale the way fixed line-number citations would. Scoped to
-// the same sync-relevant logic the "Without Solidus" snippets illustrate —
-// not the whole file — so the two sides stay a fair comparison; the full
-// file is 690+ lines, most of it canvas/DOM code neither side varies on.
-function slice(startMarker: string, endMarkerExclusive: string): string {
-    const start = ownSource.indexOf(startMarker);
-    const end = start === -1 ? -1 : ownSource.indexOf(endMarkerExclusive, start);
-    if (start === -1 || end === -1)
-        return '// [snippet marker not found — main.ts changed, re-check loc section]';
-    return ownSource.slice(start, end).trimEnd();
-}
+// The app's own files — identical either way, since Solidus only replaces
+// the networking + CRDT/state-sync layer, not the UI/canvas/connection code.
+const appFileSnippets: CodeSnippet[] = [
+    { title: 'src/main.ts', source: 'apps/whiteboard-demo/src/main.ts', code: ownSource.trimEnd() },
+    {
+        title: 'src/style.css',
+        source: 'apps/whiteboard-demo/src/style.css',
+        code: ownStyle.trimEnd(),
+    },
+    { title: 'index.html', source: 'apps/whiteboard-demo/index.html', code: ownHtml.trimEnd() },
+];
 
-// Each pair below (with vs without) covers the exact same responsibility,
-// in the same order on both sides, so the two columns line up row-for-row
-// instead of comparing unrelated chunks of code.
-const withSolidusSnippets: CodeSnippet[] = [
+// "With Solidus" is just this app's own files — the networking/CRDT layer
+// comes from the solidus package, not from code in this app.
+const withSolidusSnippets: CodeSnippet[] = appFileSnippets;
+
+// "Without Solidus" is the same app files, PLUS every real packages/core
+// file that implements the networking + CRDT/state-sync behavior this app
+// gets from Solidus instead (the exact files loc-stats.json traces to
+// produce the 3341 total) — the full, real source, not an illustrative
+// sketch, so every line counted in the headline number is shown here.
+const coreFileSnippets: CodeSnippet[] = [
+    { title: 'index.ts', source: 'packages/core/src/index.ts', code: coreIndex.trimEnd() },
+    { title: 'types.ts', source: 'packages/core/src/types.ts', code: coreTypes.trimEnd() },
     {
-        title: 'Setting up networking and handling remote updates',
-        source: 'apps/whiteboard-demo/src/main.ts',
-        code: [
-            slice('solidusInstance = solidus({', '// Create state with offline data if available'),
-            slice('network = solidusInstance.create({', 'await network!.waitUntilOpen();'),
-        ].join('\n\n'),
+        title: 'networking/create-networking-plugin.ts',
+        source: 'packages/core/src/networking/create-networking-plugin.ts',
+        code: coreCreateNetworkingPlugin.trimEnd(),
     },
     {
-        title: 'Sharing a local change',
-        source: 'apps/whiteboard-demo/src/main.ts',
-        code: [
-            slice('// Commit the stroke to shared state', '    currentStroke = null;'),
-            slice(
-                '// Clear all strokes by setting length to 0',
-                "    console.log('[Clear] Strokes cleared",
-            ),
-        ].join('\n\n'),
+        title: 'networking/signaling-client.ts',
+        source: 'packages/core/src/networking/signaling-client.ts',
+        code: coreSignalingClient.trimEnd(),
     },
     {
-        title: 'Catching up a newly joined peer',
-        source: 'apps/whiteboard-demo/src/main.ts',
-        code: slice('network!.onPeerJoin((peerId) => {', '        network!.onPeerLeave'),
+        title: 'networking/types.ts',
+        source: 'packages/core/src/networking/types.ts',
+        code: coreNetworkingTypes.trimEnd(),
+    },
+    {
+        title: 'networking/webrtc/index.ts',
+        source: 'packages/core/src/networking/webrtc/index.ts',
+        code: coreWebrtcIndex.trimEnd(),
+    },
+    {
+        title: 'networking/webrtc/peer.ts',
+        source: 'packages/core/src/networking/webrtc/peer.ts',
+        code: coreWebrtcPeer.trimEnd(),
+    },
+    {
+        title: 'networking/webrtc/send-queue.ts',
+        source: 'packages/core/src/networking/webrtc/send-queue.ts',
+        code: coreWebrtcSendQueue.trimEnd(),
+    },
+    {
+        title: 'networking/webrtc/transport.ts',
+        source: 'packages/core/src/networking/webrtc/transport.ts',
+        code: coreWebrtcTransport.trimEnd(),
+    },
+    {
+        title: 'networking/webrtc/types.ts',
+        source: 'packages/core/src/networking/webrtc/types.ts',
+        code: coreWebrtcTypes.trimEnd(),
+    },
+    {
+        title: 'state-sync/index.ts',
+        source: 'packages/core/src/state-sync/index.ts',
+        code: coreStateSyncIndex.trimEnd(),
+    },
+    {
+        title: 'state-sync/apply-operation.ts',
+        source: 'packages/core/src/state-sync/apply-operation.ts',
+        code: coreApplyOperation.trimEnd(),
+    },
+    {
+        title: 'state-sync/datatypes/array.ts',
+        source: 'packages/core/src/state-sync/datatypes/array.ts',
+        code: coreArray.trimEnd(),
+    },
+    {
+        title: 'state-sync/types.ts',
+        source: 'packages/core/src/state-sync/types.ts',
+        code: coreStateSyncTypes.trimEnd(),
+    },
+    {
+        title: 'state-sync/integrations/merkle-eg-walker/dag-syncer.ts',
+        source: 'packages/core/src/state-sync/integrations/merkle-eg-walker/dag-syncer.ts',
+        code: coreDagSyncer.trimEnd(),
+    },
+    {
+        title: 'state-sync/integrations/merkle-eg-walker/eg-walker.ts',
+        source: 'packages/core/src/state-sync/integrations/merkle-eg-walker/eg-walker.ts',
+        code: coreEgWalker.trimEnd(),
+    },
+    {
+        title: 'state-sync/integrations/merkle-eg-walker/event-graph.ts',
+        source: 'packages/core/src/state-sync/integrations/merkle-eg-walker/event-graph.ts',
+        code: coreEventGraph.trimEnd(),
+    },
+    {
+        title: 'state-sync/integrations/merkle-eg-walker/handlers.ts',
+        source: 'packages/core/src/state-sync/integrations/merkle-eg-walker/handlers.ts',
+        code: coreHandlers.trimEnd(),
+    },
+    {
+        title: 'state-sync/integrations/merkle-eg-walker/index.ts',
+        source: 'packages/core/src/state-sync/integrations/merkle-eg-walker/index.ts',
+        code: coreMerkleIndex.trimEnd(),
+    },
+    {
+        title: 'state-sync/integrations/merkle-eg-walker/types.ts',
+        source: 'packages/core/src/state-sync/integrations/merkle-eg-walker/types.ts',
+        code: coreMerkleTypes.trimEnd(),
+    },
+    {
+        title: 'state-sync/integrations/merkle-eg-walker/utils.ts',
+        source: 'packages/core/src/state-sync/integrations/merkle-eg-walker/utils.ts',
+        code: coreMerkleUtils.trimEnd(),
     },
 ];
 
-// Illustrative only — this implementation does not exist anywhere in this
-// repository. It sketches the equivalent responsibilities (exchanging
-// updates, ordering/merging them, connection lifecycle, catch-up) that the
-// snippets above get from Solidus, at roughly the same scope as this demo
-// actually needs (push a stroke, clear the board) — not a general-purpose
-// CRDT. Each title below matches the "With Solidus" snippet it replaces.
+const appFilesTotalLines = appFileSnippets.reduce((sum, s) => sum + s.code.split('\n').length, 0);
+
+// Don't re-render the identical app files a second time — same bytes as the
+// "With Solidus" column, so showing them again just duplicates code on
+// screen. One line explains where they went instead.
 const withoutSolidusSnippets: CodeSnippet[] = [
     {
-        title: 'Setting up networking and handling remote updates',
-        code: `signalingSocket.onclose = () => {
-    connectionStatus.textContent = 'Signaling disconnected, retrying…';
-    setTimeout(connectToSignalingServer, retryDelayMs);
-};
-
-function setupPeerConnection(peerId: string) {
-    const pc = new RTCPeerConnection({ iceServers });
-    const channel = pc.createDataChannel('whiteboard');
-
-    channel.onopen = () => openDataChannels.set(peerId, channel);
-    channel.onclose = () => openDataChannels.delete(peerId);
-    channel.onerror = (err) => console.error('[P2P] Data channel error:', err);
-    channel.onmessage = (e) => onDataChannelMessage(peerId, e.data);
-
-    pc.onicecandidate = (e) => {
-        if (e.candidate) sendSignal(peerId, { type: 'ice-candidate', candidate: e.candidate });
-    };
-    pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-            openDataChannels.delete(peerId);
-            peerConnections.delete(peerId);
-        }
-    };
-    // ...create/send an SDP offer, handle the answer, apply ICE candidates
-    // from the signaling server, matching the real offer/answer/ICE
-    // exchange this demo's webrtc() plugin already does.
-    return pc;
-}
-
-const pendingByPeer = new Map<string, Map<number, any>>();
-const nextExpectedSeq = new Map<string, number>();
-
-function onDataChannelMessage(fromPeerId: string, raw: string) {
-    const msg = JSON.parse(raw);
-    const pending = pendingByPeer.get(fromPeerId) ?? new Map();
-    pendingByPeer.set(fromPeerId, pending);
-    pending.set(msg.seq, msg);
-
-    let expected = nextExpectedSeq.get(fromPeerId) ?? 1;
-    while (pending.has(expected)) {
-        applyRemoteMessage(pending.get(expected));
-        pending.delete(expected);
-        expected++;
-    }
-    nextExpectedSeq.set(fromPeerId, expected);
-}
-
-function applyRemoteMessage(msg: any) {
-    if (msg.kind === 'stroke-added') {
-        docState.strokes.push(msg.stroke);
-    } else if (msg.kind === 'cleared') {
-        // Naive: drops any locally-queued-but-unsent stroke too. A real
-        // CRDT (what merkleEGWalker provides) resolves this with a
-        // Merkle DAG + Lamport clocks instead of last-writer-wins here.
-        docState.strokes = [];
-    }
-    redraw();
-}`,
+        title: 'App files (identical, shown in the "With Solidus" column)',
+        source: 'src/main.ts, src/style.css, index.html',
+        code: `// Same ${appFilesTotalLines} lines as the "With Solidus" column — the UI/canvas/\n// connection-control code doesn't change either way. Scroll left to see them.\n// Everything below is the extra code this app would need to hand-write\n// to replace what Solidus (webrtc() + merkleEGWalker()) provides.`,
     },
-    {
-        title: 'Sharing a local change',
-        code: `let localSeq = 0;
-
-function broadcastStrokeAdded(stroke: Stroke) {
-    const message = JSON.stringify({
-        kind: 'stroke-added',
-        peerId: localPeerId,
-        seq: ++localSeq,
-        stroke,
-    });
-    for (const channel of openDataChannels.values()) {
-        if (channel.readyState === 'open') channel.send(message);
-    }
-}
-
-function broadcastCleared() {
-    const message = JSON.stringify({
-        kind: 'cleared',
-        peerId: localPeerId,
-        seq: ++localSeq,
-    });
-    for (const channel of openDataChannels.values()) {
-        if (channel.readyState === 'open') channel.send(message);
-    }
-}`,
-    },
-    {
-        title: 'Catching up a newly joined peer',
-        code: `function onPeerConnectionOpen(peerId: string) {
-    // New peer has no history yet — send them everything we have.
-    const message = JSON.stringify({
-        kind: 'full-state',
-        peerId: localPeerId,
-        strokes: currentStrokes,
-    });
-    openDataChannels.get(peerId)?.send(message);
-}
-
-function applyFullState(msg: any) {
-    // Naive: last writer wins — overwrites anything drawn here first,
-    // including a concurrent Clear. A real CRDT merges by operation
-    // history instead of replacing the whole array.
-    if (msg.kind === 'full-state') {
-        currentStrokes = msg.strokes;
-        redraw();
-    }
-}`,
-    },
+    ...coreFileSnippets,
 ];
 
 function renderCodeSnippets(containerId: string, snippets: CodeSnippet[]) {

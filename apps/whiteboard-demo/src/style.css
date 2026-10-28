@@ -369,6 +369,10 @@ button:disabled {
 .code-panel {
     display: none;
     min-width: 0;
+    max-height: 75vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
 }
 
 .code-panel.active {

@@ -191,6 +191,7 @@ export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
     let doc: Y.Doc;
     let proxyRegistry: Map<string, any>;
     let isApplyingRemote = false;
+    let lastRemotePeerId = 'unknown';
 
     return {
         name: 'yjs',
@@ -226,6 +227,14 @@ export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
 
                 isApplyingRemote = false;
                 void yjsEvents;
+
+                // Notify consumers (e.g. onRemoteOperation) that remote state landed,
+                // same as the merkleEGWalker integration — otherwise UI bound to the
+                // proxied state never learns a remote change arrived.
+                events.emit('state:remote-applied', {
+                    peerId: lastRemotePeerId,
+                    op: { type: 'SET', path: [], value: null, timestamp: Date.now() },
+                });
             });
 
             events.on('destroy', () => {
@@ -237,8 +246,17 @@ export function yjs(options: YjsPluginOptions = {}): SolidusPlugin {
             });
 
             events.on('state:remote-operation', (peerId: string, op: Uint8Array) => {
-                void peerId;
+                lastRemotePeerId = peerId;
                 Y.applyUpdate(doc, op);
+            });
+
+            // Each peer's Y.Doc is created and initialized independently (before any
+            // network connection exists), so their initial state has no shared causal
+            // history. Incremental updates alone never converge in that case — Yjs
+            // needs each side's full document state at least once. Send it whenever a
+            // peer connects, reusing the existing state:broadcast -> wire pipeline.
+            events.on('network:peer-joined', () => {
+                events.emit('state:broadcast', Y.encodeStateAsUpdate(doc));
             });
         },
     };

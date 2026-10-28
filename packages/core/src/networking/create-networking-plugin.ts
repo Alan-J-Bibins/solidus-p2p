@@ -22,6 +22,13 @@ function serializeNetworkValue(value: any): any {
         };
     }
 
+    // Uint8Array (e.g. a yjs binary update) has no JSON representation of its
+    // own — without this it falls through to the generic object branch below
+    // and becomes {"0":1,"1":2,...}, which can't be decoded back into bytes.
+    if (value instanceof Uint8Array) {
+        return { __solidusType: 'Uint8Array', data: Array.from(value) };
+    }
+
     if (Array.isArray(value)) return value.map(serializeNetworkValue);
 
     if (value !== null && typeof value === 'object') {
@@ -41,6 +48,10 @@ function deserializeNetworkValue(value: any): any {
     if (value !== null && typeof value === 'object') {
         if (value.__solidusType === 'Asset') {
             return new Asset(value.id, value.size, value.type, value.name);
+        }
+
+        if (value.__solidusType === 'Uint8Array') {
+            return new Uint8Array(value.data);
         }
 
         const result: Record<string, any> = {};
